@@ -1,0 +1,31 @@
+.git
+**/.git
+node_modules
+**/node_modules
+dist
+**/dist
+coverage
+**/coverage
+data
+.env
+.env.*
+!.env.example
+*.log
+.cache
+**/.cache
+.pnpm-store
+**/.pnpm-store
+playwright-report
+**/playwright-report
+test-results
+**/test-results
+.playwright-cli
+.playwright-data
+apps/web/tauri/target
+
+# WebA keeps source modules under directories named data; only the repository
+# root data directory is disposable for this image.
+!apps/web/src/hooks/data
+!apps/web/src/hooks/data/**
+!apps/web/src/util/data
+!apps/web/src/util/data/**

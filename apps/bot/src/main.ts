@@ -98,10 +98,11 @@ async function main(): Promise<void> {
     db,
     client,
     port: config.internalMediaPort,
+    host: config.internalMediaHost,
     secret: config.internalMediaSecret,
     log: (line) => console.error(`[media-origin] ${line}`),
   });
-  console.log(`Media origin listening on 127.0.0.1:${config.internalMediaPort}.`);
+  console.log(`Media origin listening on ${config.internalMediaHost}:${config.internalMediaPort}.`);
   const app = new BotApp({
     config,
     db,

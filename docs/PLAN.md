@@ -198,6 +198,8 @@ previous message's (`next < prev`) → mark `nestedForward` → render it in
 ├── deploy/
 │   ├── build-app.mjs    # backend + share frontend build helper
 │   └── start-app.mjs   # bot + server process supervisor
+├── Dockerfile           # multi-stage backend + share frontend image
+├── docker-compose.yml   # server and bot services
 └── README.md / LICENSE (GPL-3.0) / docs/UPSTREAM.md
 ```
 
@@ -370,18 +372,24 @@ it later.
 - Acceptance: tapping the direct link inside Telegram opens the share
   fullscreen
 
-**Commit 20 — `refactor(ops): simplify source deployment`**
+**Commit 20 — `refactor(ops): source and Docker deployment`**
 
 - The Node.js server serves the built share frontend, sanitized API and media
   endpoints from one configurable HTTP listener.
 - A root `.env`, `pnpm build:deploy` and `pnpm start` are the complete source
   deployment workflow; the start command supervises the bot and server.
+- The root `Dockerfile` builds the backend and WebA from source. The root
+  `docker-compose.yml` runs the server and bot as separate services sharing
+  the project-local `./data` bind mount and private media-origin network.
+- Docker maps only a loopback host port for the HTTP server. Host reverse proxy
+  and TLS management remain outside the repository.
 - Share HTML responses declare `noindex, nofollow`; `PUBLIC_ORIGIN` is passed
   into the frontend build automatically.
-- Document the direct listener, health check, local data directory and simple
-  update procedure.
-- Acceptance: a clean machine runs the whole flow with one build command and
-  one start command.
+- Document both source and Docker workflows, health checks, persistent data,
+  the shared internal media secret, and the update procedure.
+- Acceptance: a clean Linux or WSL machine builds the root image, starts the
+  two Compose services, passes `/healthz`, serves the share frontend, and
+  preserves `./data` across container recreation.
 
 **Commit 21 — `docs: upstream sync procedure and license`**
 

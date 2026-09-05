@@ -1,4 +1,4 @@
-// Loopback-only Telegram media origin. The public HTTP server never receives
+// Private Telegram media origin. The public HTTP server never receives
 // Telegram credentials; it authenticates here and streams one registered
 // media object into its bounded cache.
 
@@ -15,6 +15,7 @@ export interface MediaOriginOptions {
   db: StorageDatabase;
   client: TelegramClient;
   port: number;
+  host?: string;
   secret: string;
   log?: (line: string) => void;
 }
@@ -36,7 +37,7 @@ export function startMediaOrigin(options: MediaOriginOptions): Promise<Server> {
 
   return new Promise((resolve, reject) => {
     server.once('error', reject);
-    server.listen(options.port, '127.0.0.1', () => {
+    server.listen(options.port, options.host ?? '127.0.0.1', () => {
       server.off('error', reject);
       resolve(server);
     });

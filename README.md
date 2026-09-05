@@ -40,36 +40,42 @@ User forwards messages
   a Git submodule.
 - `packages/tlbridge` owns TL serialization, hydration, sanitization and the
   nested-forward heuristic.
-- `deploy` contains the source build helper and the server/bot supervisor.
+- `deploy` contains the source build helper and the source-mode server/bot
+  supervisor. The root `Dockerfile` and `docker-compose.yml` provide the
+  container deployment.
 
 The authoritative design and implementation history are in
 [docs/PLAN.md](docs/PLAN.md).
 
 ## Deployment
 
-Prerequisites:
+The recommended deployment uses Docker Engine and Docker Compose v2. It builds
+one image from the checked-out source, then runs the HTTP server and Telegram
+bot as separate services sharing the project-local `./data` directory. Only
+the server is bound to the host, and only on `127.0.0.1:3000` by default.
 
-- Node.js 24.11 or newer, pnpm 10 and npm 11
-- Git and the native build tools required by `better-sqlite3`
-- Telegram `api_id` and `api_hash` from
-  [my.telegram.org](https://my.telegram.org/)
-- A bot token and Mini App configured through
-  [@BotFather](https://t.me/BotFather)
+The host's existing reverse proxy remains responsible for public HTTPS. Set
+`PUBLIC_ORIGIN` to the final address used to open the share page, configure the
+same address in BotFather, and rebuild after changing it.
 
-The source deployment uses the root `.env`, one build command and one start
-command. The Node.js server serves the built WebA share view, API and media
-from the same port. It listens on `127.0.0.1:3000` by default; set `HOST` and
-`PORT` in `.env` when a different listener is needed.
+```bash
+cp .env.example .env
+# Edit .env and set API_ID, API_HASH, BOT_TOKEN, PUBLIC_ORIGIN,
+# SANITIZE_SECRET, BOT_USERNAME and INTERNAL_MEDIA_SECRET.
+mkdir -p data
+docker compose config
+docker compose up -d --build
+curl --fail http://127.0.0.1:3000/healthz
+```
 
-Set `PUBLIC_ORIGIN` to the address used to open the share page without a
-trailing slash. In BotFather, create a named Web App for the bot, set its URL
-to that origin and put its short name in `MINIAPP_SHORT_NAME`. Share replies
-then include both `PUBLIC_ORIGIN/s/<shareId>` and
-`t.me/<bot>/<short-name>?startapp=<shareId>` links. The value is embedded into
-the web build, so rebuild after changing it.
+The bot and server use the same `INTERNAL_MEDIA_SECRET`. The Compose file
+connects the server to the bot's private `3001` media-origin port without
+publishing that port. `docker compose down` removes containers but keeps
+`./data`; back up that directory before upgrades or host maintenance.
 
-See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for the complete source setup,
-build and start procedure.
+The source deployment remains available when Docker is not desired. See
+[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for both workflows and the reverse
+proxy boundary.
 
 ## Local Development
 
@@ -82,7 +88,7 @@ cp .env.example .env
 pnpm install
 
 cd apps/web
-npm ci
+npm ci --install-strategy=nested
 cd ../..
 ```
 

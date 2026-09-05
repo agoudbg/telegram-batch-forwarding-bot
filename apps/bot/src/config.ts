@@ -14,6 +14,8 @@ export interface BotConfig {
   miniAppShortName?: string;
   dataDir: string;
   internalMediaPort: number;
+  /** Bind address for the private media origin; defaults to loopback. */
+  internalMediaHost: string;
   internalMediaSecret: string;
   mediaCacheMaxBytes: number;
   batchSilenceMs: number;
@@ -69,6 +71,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): BotConfig {
     miniAppShortName: env.MINIAPP_SHORT_NAME || undefined,
     dataDir: env.DATA_DIR || './data',
     internalMediaPort: optionalInt(env, 'INTERNAL_MEDIA_PORT', DEFAULT_INTERNAL_MEDIA_PORT),
+    internalMediaHost: env.INTERNAL_MEDIA_HOST || '127.0.0.1',
     internalMediaSecret: required(env, 'INTERNAL_MEDIA_SECRET'),
     mediaCacheMaxBytes: optionalSafeInt(
       env,

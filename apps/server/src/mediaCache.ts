@@ -435,11 +435,12 @@ export class HttpMediaOriginClient implements MediaOriginClient {
   constructor(
     private readonly port: number,
     private readonly secret: string,
+    private readonly host = '127.0.0.1',
   ) {}
 
   fetch(mediaKey: string, variant: MediaCacheVariant, signal?: AbortSignal): Promise<Response> {
     return fetch(
-      `http://127.0.0.1:${this.port}/internal/media/${encodeURIComponent(mediaKey)}?variant=${variant}`,
+      `http://${this.host}:${this.port}/internal/media/${encodeURIComponent(mediaKey)}?variant=${variant}`,
       { headers: { Authorization: `Bearer ${this.secret}` }, signal },
     );
   }

@@ -15,6 +15,8 @@ export interface ServerConfig {
    *  fallback links (docs/PLAN.md §2.5); undefined disables the button */
   botUsername?: string;
   internalMediaPort: number;
+  /** Hostname or address of the private bot media origin. */
+  internalMediaHost: string;
   internalMediaSecret: string;
   mediaCacheMaxBytes: number;
   mediaCacheLowWatermarkBytes: number;
@@ -69,6 +71,7 @@ export function loadServerConfig(env: NodeJS.ProcessEnv = process.env): ServerCo
     sanitizeSecret,
     botUsername: env.BOT_USERNAME?.replace(/^@/, '') || undefined,
     internalMediaPort: positiveInt(env, 'INTERNAL_MEDIA_PORT', DEFAULT_INTERNAL_MEDIA_PORT),
+    internalMediaHost: env.INTERNAL_MEDIA_HOST || '127.0.0.1',
     internalMediaSecret:
       env.INTERNAL_MEDIA_SECRET === undefined || env.INTERNAL_MEDIA_SECRET === ''
         ? (() => {

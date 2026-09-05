@@ -28,6 +28,7 @@ describe('loadConfig', () => {
       miniAppShortName: undefined,
       dataDir: './data',
       internalMediaPort: 3001,
+      internalMediaHost: '127.0.0.1',
       internalMediaSecret: 'internal-test-secret',
       mediaCacheMaxBytes: 5368709120,
       batchSilenceMs: 10000,
@@ -61,6 +62,12 @@ describe('loadConfig', () => {
   it('accepts a persistent session file', () => {
     expect(loadConfig({ ...BASE_ENV, SESSION_FILE: '/data/session.txt' }).sessionFile).toBe(
       '/data/session.txt',
+    );
+  });
+
+  it('accepts a separate media origin host for container networking', () => {
+    expect(loadConfig({ ...BASE_ENV, INTERNAL_MEDIA_HOST: '0.0.0.0' }).internalMediaHost).toBe(
+      '0.0.0.0',
     );
   });
 

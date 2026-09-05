@@ -1,0 +1,64 @@
+name: telegram-batch-forwarding-bot
+
+x-app: &app
+  image: telegram-batch-forwarding-bot:local
+  build:
+    context: .
+    dockerfile: Dockerfile
+    args:
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?PUBLIC_ORIGIN must be set in .env}
+  env_file:
+    - .env
+  user: "${TBFB_UID:-1000}:${TBFB_GID:-1000}"
+  init: true
+  read_only: true
+  tmpfs:
+    - /tmp
+  restart: unless-stopped
+  stop_grace_period: 30s
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  volumes:
+    - type: bind
+      source: ./data
+      target: /data
+      bind:
+        create_host_path: false
+
+services:
+  server:
+    <<: *app
+    command: ["node", "apps/server/dist/main.js"]
+    environment:
+      DATA_DIR: /data
+      HOST: 0.0.0.0
+      PORT: 3000
+      SESSION_FILE: /data/session.txt
+      INTERNAL_MEDIA_HOST: bot
+    ports:
+      - "127.0.0.1:${TBFB_PORT:-3000}:3000"
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://127.0.0.1:3000/healthz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+
+  bot:
+    <<: *app
+    command: ["node", "apps/bot/dist/main.js"]
+    environment:
+      DATA_DIR: /data
+      SESSION_FILE: /data/session.txt
+      INTERNAL_MEDIA_HOST: 0.0.0.0
+    expose:
+      - "3001"
+    depends_on:
+      server:
+        condition: service_healthy

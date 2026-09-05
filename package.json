@@ -10,7 +10,7 @@
     "build": "pnpm -r run build",
     "build:deploy": "node deploy/build-app.mjs",
     "start": "node deploy/start-app.mjs",
-    "test": "pnpm -r run test",
+    "test": "pnpm -r run test && node --test docker-contract.test.mjs",
     "typecheck": "pnpm -r run typecheck",
     "lint": "eslint .",
     "format": "prettier --write ."

@@ -13,6 +13,7 @@ describe('loadServerConfig', () => {
       host: '127.0.0.1',
       port: 3000,
       internalMediaPort: 3001,
+      internalMediaHost: '127.0.0.1',
       internalMediaSecret: 'internal-secret',
       mediaCacheMaxBytes: 5 * 1024 * 1024 * 1024,
       mediaCacheLowWatermarkBytes: 4 * 1024 * 1024 * 1024,
@@ -48,5 +49,11 @@ describe('loadServerConfig', () => {
 
   it('only exposes the server when HOST is explicitly overridden', () => {
     expect(loadServerConfig({ ...BASE_ENV, HOST: '0.0.0.0' }).host).toBe('0.0.0.0');
+  });
+
+  it('accepts a separate media origin host for container networking', () => {
+    expect(
+      loadServerConfig({ ...BASE_ENV, INTERNAL_MEDIA_HOST: 'bot' }).internalMediaHost,
+    ).toBe('bot');
   });
 });

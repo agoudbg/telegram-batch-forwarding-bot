@@ -35,7 +35,11 @@ function main(): void {
   const mediaCache = new MediaCache({
     db,
     dataDir: config.dataDir,
-    origin: new HttpMediaOriginClient(config.internalMediaPort, config.internalMediaSecret),
+    origin: new HttpMediaOriginClient(
+      config.internalMediaPort,
+      config.internalMediaSecret,
+      config.internalMediaHost,
+    ),
     maxBytes: config.mediaCacheMaxBytes,
     lowWatermarkBytes: config.mediaCacheLowWatermarkBytes,
     ttlSeconds: config.mediaCacheTtlSeconds,
