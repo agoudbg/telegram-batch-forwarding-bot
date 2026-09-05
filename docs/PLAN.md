@@ -196,8 +196,7 @@ previous message's (`next < prev`) → mark `nestedForward` → render it in
 ├── packages/
 │   └── tlbridge/       # TL JSON serialize/hydrate, sanitizer, forward heuristic, share-id utils (shared)
 ├── deploy/
-│   ├── systemd/        # preferred source deployment service
-│   ├── nginx/          # host reverse-proxy example
+│   ├── build-app.mjs    # backend + share frontend build helper
 │   └── start-app.mjs   # bot + server process supervisor
 └── README.md / LICENSE (GPL-3.0) / docs/UPSTREAM.md
 ```
@@ -316,8 +315,8 @@ it later.
 
 - Submodule pointing at our fork's `share-view` branch; first fork commit:
   `APP_MOCKED_CLIENT` build, login stripped, new `/s/:shareId` route
-- Acceptance: `pnpm build` yields static assets, opening shows an empty
-  message area
+- Acceptance: `npm run build:share` yields static assets, opening shows an
+  empty message area
 
 **Commit 13 — `feat(web): data injection (hydration + fetchMessages replacement + peer injection)`**
 
@@ -371,15 +370,18 @@ it later.
 - Acceptance: tapping the direct link inside Telegram opens the share
   fullscreen
 
-**Commit 20 — `feat(ops): production deployment`**
+**Commit 20 — `refactor(ops): simplify source deployment`**
 
-- Source build supervised by systemd, with the existing host
-  reverse proxy owning public ports and TLS.
-- Share HTML and reverse-proxy responses declare `noindex, nofollow`; crawlers
-  remain allowed to fetch pages so they can observe the indexing directive.
-- Document environment, health checks, upgrades, backups and rollback.
-- Acceptance: a clean machine runs the whole flow without
-  exposing the application server directly.
+- The Node.js server serves the built share frontend, sanitized API and media
+  endpoints from one configurable HTTP listener.
+- A root `.env`, `pnpm build:deploy` and `pnpm start` are the complete source
+  deployment workflow; the start command supervises the bot and server.
+- Share HTML responses declare `noindex, nofollow`; `PUBLIC_ORIGIN` is passed
+  into the frontend build automatically.
+- Document the direct listener, health check, local data directory and simple
+  update procedure.
+- Acceptance: a clean machine runs the whole flow with one build command and
+  one start command.
 
 **Commit 21 — `docs: upstream sync procedure and license`**
 

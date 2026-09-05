@@ -38,26 +38,12 @@ const dirs: string[] = [];
 const caches: MediaCache[] = [];
 
 describe('resolveMediaClientId', () => {
-  it('ignores forwarded addresses unless the proxy is explicitly trusted', () => {
-    const addresses = {
-      remoteAddress: '198.51.100.10',
-      forwardedFor: '203.0.113.20, 192.0.2.30',
-    };
-
-    expect(resolveMediaClientId(addresses, false)).toBe('198.51.100.10');
-    expect(resolveMediaClientId(addresses, true)).toBe('203.0.113.20');
+  it('uses the direct socket address', () => {
+    expect(resolveMediaClientId({ remoteAddress: '198.51.100.10' })).toBe('198.51.100.10');
   });
 
-  it('falls back to the socket address for an invalid forwarded value', () => {
-    expect(
-      resolveMediaClientId(
-        {
-          remoteAddress: '198.51.100.10',
-          forwardedFor: 'spoofed-client',
-        },
-        true,
-      ),
-    ).toBe('198.51.100.10');
+  it('falls back to unknown for an invalid socket address', () => {
+    expect(resolveMediaClientId({ remoteAddress: 'spoofed-client' })).toBe('unknown');
   });
 });
 

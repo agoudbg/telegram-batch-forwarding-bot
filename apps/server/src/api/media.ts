@@ -30,7 +30,6 @@ export interface MediaRouteDeps {
   mediaCache?: MediaCache;
   maxHostedMediaBytes?: number;
   mediaGovernor?: MediaRequestGovernor;
-  trustProxy?: boolean;
 }
 
 /** Media keys are content-stable (document/photo ids), so responses are
@@ -77,7 +76,7 @@ export function registerMediaRoutes(app: Hono, deps: MediaRouteDeps): void {
     const access = checkShareAccess(deps.db, shareId);
     if (access === 'not_found') return c.json({ error: 'not_found' }, 404);
     if (access === 'revoked') return c.json({ error: 'revoked' }, 410);
-    const clientId = getClientId(c, deps.trustProxy === true);
+    const clientId = getClientId(c);
     if (deps.mediaGovernor !== undefined && !deps.mediaGovernor.allowRequest(shareId, clientId)) {
       return c.json({ error: 'rate_limited' }, 429, { 'Retry-After': '1' });
     }
@@ -227,7 +226,6 @@ function streamHandle(
 
 interface ClientAddressInput {
   remoteAddress?: string;
-  forwardedFor?: string;
 }
 
 interface NodeRequestBindings {
@@ -239,28 +237,18 @@ interface NodeRequestBindings {
   server?: NodeRequestBindings;
 }
 
-export function resolveMediaClientId(input: ClientAddressInput, trustProxy: boolean): string {
-  if (trustProxy) {
-    const forwardedAddress = input.forwardedFor?.split(',')[0]?.trim();
-    if (forwardedAddress !== undefined && isIP(forwardedAddress) !== 0) {
-      return forwardedAddress;
-    }
-  }
+export function resolveMediaClientId(input: ClientAddressInput): string {
   const remoteAddress = input.remoteAddress?.trim();
   return remoteAddress !== undefined && isIP(remoteAddress) !== 0 ? remoteAddress : 'unknown';
 }
 
-function getClientId(c: Context, trustProxy: boolean): string {
+function getClientId(c: Context): string {
   const environment = (c.env ?? {}) as NodeRequestBindings;
   const bindings = environment.server ?? environment;
   const remoteAddress = bindings.incoming?.socket?.remoteAddress;
-  return resolveMediaClientId(
-    {
-      remoteAddress: typeof remoteAddress === 'string' ? remoteAddress : undefined,
-      forwardedFor: c.req.header('x-forwarded-for'),
-    },
-    trustProxy,
-  );
+  return resolveMediaClientId({
+    remoteAddress: typeof remoteAddress === 'string' ? remoteAddress : undefined,
+  });
 }
 
 function toWebStream(

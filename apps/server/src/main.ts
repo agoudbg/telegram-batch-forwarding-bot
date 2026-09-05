@@ -3,6 +3,7 @@
 
 import { existsSync } from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { serve } from '@hono/node-server';
 
@@ -49,6 +50,13 @@ function main(): void {
     bandwidthBytesPerSecond: config.mediaBandwidthBytesPerSecond,
     bandwidthBurstBytes: config.mediaBandwidthBurstBytes,
   });
+  const webRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../web/dist');
+  const webIndexPath = path.join(webRoot, 'index.html');
+  if (!existsSync(webIndexPath)) {
+    console.warn(
+      `Web build not found at ${webIndexPath}; run pnpm build:deploy before serving pages.`,
+    );
+  }
   const app = createServerApp({
     db,
     sanitizeSecret: config.sanitizeSecret,
@@ -57,7 +65,7 @@ function main(): void {
     mediaCache,
     maxHostedMediaBytes: config.mediaCacheMaxBytes,
     mediaGovernor,
-    trustProxy: config.trustProxy,
+    webRoot: existsSync(webIndexPath) ? webRoot : undefined,
   });
 
   serve({ fetch: app.fetch, hostname: config.host, port: config.port }, (info) => {

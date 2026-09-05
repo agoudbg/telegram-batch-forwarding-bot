@@ -5,6 +5,9 @@
 // unknown or still-pending shares are indistinguishable (404), revoked
 // shares answer 410 Gone.
 
+import path from 'node:path';
+
+import { serveStatic } from '@hono/node-server/serve-static';
 import { Hono } from 'hono';
 
 import type { TLJsonValue } from '@tbfb/tlbridge';
@@ -74,7 +77,8 @@ export interface ServerAppDeps {
   mediaCache?: MediaCache;
   maxHostedMediaBytes?: number;
   mediaGovernor?: MediaRequestGovernor;
-  trustProxy?: boolean;
+  /** Absolute path to the built share frontend. */
+  webRoot?: string;
 }
 
 function mediaUrl(shareId: string, fakeKey: string): string {
@@ -153,6 +157,19 @@ export function createServerApp(deps: ServerAppDeps): Hono {
   });
 
   registerMediaRoutes(app, deps);
+  if (deps.webRoot !== undefined) registerWebRoutes(app, deps.webRoot);
 
   return app;
+}
+
+function registerWebRoutes(app: Hono, webRoot: string): void {
+  const indexPath = path.join(webRoot, 'index.html');
+
+  app.use('/s/*', async (c, next) => {
+    c.header('X-Robots-Tag', 'noindex, nofollow');
+    await next();
+  });
+  app.get('/', serveStatic({ path: indexPath }));
+  app.get('/s/*', serveStatic({ path: indexPath }));
+  app.use('*', serveStatic({ root: webRoot }));
 }

@@ -34,43 +34,42 @@ User forwards messages
 
 - `apps/bot` handles MTProto login, batching, media-source registration,
   on-demand Telegram downloads and fallback delivery.
-- `apps/server` exposes the sanitized share API, Range endpoint and bounded
-  read-through cache.
+- `apps/server` serves the sanitized share API, Range endpoint, bounded
+  read-through cache and built share frontend from one HTTP port.
 - `apps/web` is the `share-view` branch of the telegram-tt fork, included as
   a Git submodule.
 - `packages/tlbridge` owns TL serialization, hydration, sanitization and the
   nested-forward heuristic.
-- `deploy` contains the systemd service and host Nginx configuration.
+- `deploy` contains the source build helper and the server/bot supervisor.
 
 The authoritative design and implementation history are in
 [docs/PLAN.md](docs/PLAN.md).
 
-## Production Deployment
+## Deployment
 
 Prerequisites:
 
-- Linux with systemd and Nginx
 - Node.js 24.11 or newer, pnpm 10 and npm 11
-- A public hostname whose DNS points to the host
+- Git and the native build tools required by `better-sqlite3`
 - Telegram `api_id` and `api_hash` from
   [my.telegram.org](https://my.telegram.org/)
 - A bot token and Mini App configured through
   [@BotFather](https://t.me/BotFather)
 
-The recommended deployment builds from source, runs the bot and API under
-systemd, and lets the host's existing reverse proxy own ports 80/443 and TLS.
-The API defaults to `127.0.0.1:3000`; the supplied Nginx example serves the
-WebA build and proxies `/api/` and `/media/` without exposing the application
-port.
+The source deployment uses the root `.env`, one build command and one start
+command. The Node.js server serves the built WebA share view, API and media
+from the same port. It listens on `127.0.0.1:3000` by default; set `HOST` and
+`PORT` in `.env` when a different listener is needed.
 
-Set `PUBLIC_ORIGIN` to the final HTTPS origin without a trailing slash. In
-BotFather, create a named Web App for the bot, set its URL to that origin and
-put its short name in `MINIAPP_SHORT_NAME`. Share replies then include both
-`PUBLIC_ORIGIN/s/<shareId>` and
-`t.me/<bot>/<short-name>?startapp=<shareId>` links.
+Set `PUBLIC_ORIGIN` to the address used to open the share page without a
+trailing slash. In BotFather, create a named Web App for the bot, set its URL
+to that origin and put its short name in `MINIAPP_SHORT_NAME`. Share replies
+then include both `PUBLIC_ORIGIN/s/<shareId>` and
+`t.me/<bot>/<short-name>?startapp=<shareId>` links. The value is embedded into
+the web build, so rebuild after changing it.
 
-See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for complete source installation,
-systemd, Nginx, upgrade, rollback, backup and restore procedures.
+See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for the complete source setup,
+build and start procedure.
 
 ## Local Development
 
@@ -87,16 +86,11 @@ npm ci
 cd ../..
 ```
 
-Build and start the API and bot in separate terminals:
+Build and start the API, bot and built share frontend together:
 
 ```bash
-pnpm --filter @tbfb/server build
-pnpm --filter @tbfb/server start
-```
-
-```bash
-pnpm --filter @tbfb/bot build
-pnpm --filter @tbfb/bot start
+pnpm build:deploy
+pnpm start
 ```
 
 Start the mocked WebA share view in a third terminal:

@@ -1,9 +1,20 @@
 /* global clearTimeout, console, process, setTimeout */
 
+import { existsSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
+import path from 'node:path';
 
 const FORCE_SHUTDOWN_MS = 10_000;
+const envPath = path.join(process.cwd(), '.env');
+if (existsSync(envPath)) process.loadEnvFile(envPath);
+
+const webIndexPath = path.join(process.cwd(), 'apps/web/dist/index.html');
+if (!existsSync(webIndexPath)) {
+  console.error(`Web build not found at ${webIndexPath}; run pnpm build:deploy first.`);
+  process.exit(1);
+}
+
 const childEnvironment = {
   ...process.env,
   INTERNAL_MEDIA_SECRET: process.env.INTERNAL_MEDIA_SECRET || randomBytes(32).toString('base64url'),

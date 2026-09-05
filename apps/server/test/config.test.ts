@@ -24,7 +24,6 @@ describe('loadServerConfig', () => {
       mediaRequestBurst: 20,
       mediaBandwidthBytesPerSecond: 8 * 1024 * 1024,
       mediaBandwidthBurstBytes: 16 * 1024 * 1024,
-      trustProxy: false,
     });
   });
 
@@ -49,10 +48,5 @@ describe('loadServerConfig', () => {
 
   it('only exposes the server when HOST is explicitly overridden', () => {
     expect(loadServerConfig({ ...BASE_ENV, HOST: '0.0.0.0' }).host).toBe('0.0.0.0');
-  });
-
-  it('requires an explicit valid flag before trusting a reverse proxy', () => {
-    expect(loadServerConfig({ ...BASE_ENV, TRUST_PROXY: '1' }).trustProxy).toBe(true);
-    expect(() => loadServerConfig({ ...BASE_ENV, TRUST_PROXY: 'yes' })).toThrow('TRUST_PROXY');
   });
 });
