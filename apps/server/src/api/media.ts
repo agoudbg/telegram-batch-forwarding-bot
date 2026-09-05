@@ -9,7 +9,7 @@
 
 import { createReadStream } from 'node:fs';
 import { open, stat } from 'node:fs/promises';
-import { isIP } from 'node:net';
+import { BlockList, isIP } from 'node:net';
 import path from 'node:path';
 import { Readable } from 'node:stream';
 
@@ -30,6 +30,7 @@ export interface MediaRouteDeps {
   mediaCache?: MediaCache;
   maxHostedMediaBytes?: number;
   mediaGovernor?: MediaRequestGovernor;
+  trustedProxyIps?: readonly string[];
 }
 
 /** Media keys are content-stable (document/photo ids), so responses are
@@ -70,13 +71,17 @@ export function parseRangeHeader(
 }
 
 export function registerMediaRoutes(app: Hono, deps: MediaRouteDeps): void {
+  const trustedProxies = new BlockList();
+  for (const address of deps.trustedProxyIps ?? []) {
+    trustedProxies.addAddress(address, isIP(address) === 6 ? 'ipv6' : 'ipv4');
+  }
   app.get('/media/:shareId/:key', async (c) => {
     const { shareId, key } = c.req.param();
 
     const access = checkShareAccess(deps.db, shareId);
     if (access === 'not_found') return c.json({ error: 'not_found' }, 404);
     if (access === 'revoked') return c.json({ error: 'revoked' }, 410);
-    const clientId = getClientId(c);
+    const clientId = getClientId(c, trustedProxies);
     if (deps.mediaGovernor !== undefined && !deps.mediaGovernor.allowRequest(shareId, clientId)) {
       return c.json({ error: 'rate_limited' }, 429, { 'Retry-After': '1' });
     }
@@ -226,6 +231,7 @@ function streamHandle(
 
 interface ClientAddressInput {
   remoteAddress?: string;
+  forwardedFor?: string;
 }
 
 interface NodeRequestBindings {
@@ -237,18 +243,32 @@ interface NodeRequestBindings {
   server?: NodeRequestBindings;
 }
 
-export function resolveMediaClientId(input: ClientAddressInput): string {
+export function resolveMediaClientId(input: ClientAddressInput, trustedProxies?: BlockList): string {
   const remoteAddress = input.remoteAddress?.trim();
-  return remoteAddress !== undefined && isIP(remoteAddress) !== 0 ? remoteAddress : 'unknown';
+  if (remoteAddress === undefined || isIP(remoteAddress) === 0) return 'unknown';
+  const forwardedAddress = input.forwardedFor?.trim();
+  // Require the trusted edge to overwrite this header with one validated IP.
+  // Reject chains instead of selecting a potentially attacker-supplied entry.
+  if (
+    trustedProxies?.check(remoteAddress, isIP(remoteAddress) === 6 ? 'ipv6' : 'ipv4') &&
+    forwardedAddress !== undefined && isIP(forwardedAddress) !== 0
+  ) {
+    return forwardedAddress;
+  }
+  return remoteAddress;
 }
 
-function getClientId(c: Context): string {
+function getClientId(c: Context, trustedProxies: BlockList): string {
   const environment = (c.env ?? {}) as NodeRequestBindings;
   const bindings = environment.server ?? environment;
   const remoteAddress = bindings.incoming?.socket?.remoteAddress;
-  return resolveMediaClientId({
-    remoteAddress: typeof remoteAddress === 'string' ? remoteAddress : undefined,
-  });
+  return resolveMediaClientId(
+    {
+      remoteAddress: typeof remoteAddress === 'string' ? remoteAddress : undefined,
+      forwardedFor: c.req.header('x-forwarded-for'),
+    },
+    trustedProxies,
+  );
 }
 
 function toWebStream(

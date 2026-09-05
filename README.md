@@ -77,6 +77,10 @@ The source deployment remains available when Docker is not desired. See
 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for both workflows and the reverse
 proxy boundary.
 
+When using a reverse proxy, configure `TRUSTED_PROXY_IPS` and overwrite
+`X-Forwarded-For` as described in the deployment guide so visitors have
+independent media limits.
+
 ## Local Development
 
 The backend requires Node.js 22 or newer and pnpm 10. The WebA submodule has

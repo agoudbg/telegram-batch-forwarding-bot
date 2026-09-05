@@ -77,6 +77,7 @@ export interface ServerAppDeps {
   mediaCache?: MediaCache;
   maxHostedMediaBytes?: number;
   mediaGovernor?: MediaRequestGovernor;
+  trustedProxyIps?: readonly string[];
   /** Absolute path to the built share frontend. */
   webRoot?: string;
 }

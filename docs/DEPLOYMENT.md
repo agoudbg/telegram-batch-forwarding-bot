@@ -72,6 +72,46 @@ The host reverse proxy should forward the public hostname to
 `http://127.0.0.1:3000`. Docker does not own ports 80 or 443 and does not
 manage TLS certificates. Keep the Docker port loopback-only.
 
+### Trusted proxy client addresses
+
+Before exposing the service through the host reverse proxy, set
+`TRUSTED_PROXY_IPS` in `.env` to the exact proxy socket address seen by the
+server. Otherwise all proxied visitors share one media request and bandwidth
+allowance. The default empty value ignores forwarding headers.
+
+For the Linux Docker bridge deployment above, host connections normally appear
+as the bridge gateway. Inspect its address after starting the containers:
+
+```bash
+docker inspect --format '{{range .NetworkSettings.Networks}}{{.Gateway}}{{end}}' "$(docker compose ps -q server)"
+```
+
+For example, if that returns `172.18.0.1`, set
+`TRUSTED_PROXY_IPS=172.18.0.1`. Recheck after recreating the Compose network;
+do not trust the whole container subnet. For source mode with a local reverse
+proxy, use `TRUSTED_PROXY_IPS=127.0.0.1,::1`. Alternate network arrangements
+must use the actual socket peer address instead of assuming the gateway.
+
+Configure the trusted edge proxy to **overwrite** `X-Forwarded-For` with one
+validated client IP. For an Nginx edge directly receiving visitor connections,
+the relevant location directives are:
+
+```nginx
+proxy_pass http://127.0.0.1:3000;
+proxy_set_header X-Forwarded-For $remote_addr;
+```
+
+Do not append with `$proxy_add_x_forwarded_for`. Comma-separated chains,
+invalid addresses and headers from untrusted peers fall back to the socket
+address. If a CDN or another proxy sits in front of the edge, configure that
+edge's trusted upstream IP handling first so it emits a validated visitor IP.
+Apply `.env` changes with `docker compose up -d --force-recreate server`
+(restart `pnpm start` in source mode).
+
+Verify that two visitors opening different shares have separate client limits,
+and that changing forwarding headers on a direct, untrusted connection cannot
+bypass throttling. Per-share limits still apply across all visitors.
+
 ### Operations
 
 ```bash

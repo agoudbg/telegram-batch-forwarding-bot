@@ -1,7 +1,11 @@
 // HTTP server configuration, loaded from environment variables. See
 // .env.example and docs/PLAN.md, Phase 3.
 
+import { isIP } from 'node:net';
+
 export interface ServerConfig {
+  /** Exact socket peer addresses allowed to supply a client IP header. */
+  trustedProxyIps: string[];
   /** Base directory holding tbfb.db and media/ (shared with the bot) */
   dataDir: string;
   /** Interface exposed by the public HTTP server. Defaults to loopback. */
@@ -46,6 +50,12 @@ function positiveInt(env: NodeJS.ProcessEnv, name: string, fallback: number): nu
 }
 
 export function loadServerConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
+  const trustedProxyIps = env.TRUSTED_PROXY_IPS?.trim()
+    ? env.TRUSTED_PROXY_IPS.split(',').map((address) => address.trim())
+    : [];
+  if (trustedProxyIps.some((address) => isIP(address) === 0)) {
+    throw new Error('TRUSTED_PROXY_IPS must be a comma-separated list of IP addresses');
+  }
   const sanitizeSecret = env.SANITIZE_SECRET;
   if (sanitizeSecret === undefined || sanitizeSecret === '') {
     throw new Error('Missing required environment variable SANITIZE_SECRET (see .env.example)');
@@ -65,6 +75,7 @@ export function loadServerConfig(env: NodeJS.ProcessEnv = process.env): ServerCo
     throw new Error('MEDIA_CACHE_LOW_WATERMARK_BYTES must be lower than MEDIA_CACHE_MAX_BYTES');
   }
   return {
+    trustedProxyIps,
     dataDir: env.DATA_DIR || './data',
     host: env.HOST || '127.0.0.1',
     port,

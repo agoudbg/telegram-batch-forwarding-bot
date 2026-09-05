@@ -69,6 +69,7 @@ function main(): void {
     mediaCache,
     maxHostedMediaBytes: config.mediaCacheMaxBytes,
     mediaGovernor,
+    trustedProxyIps: config.trustedProxyIps,
     webRoot: existsSync(webIndexPath) ? webRoot : undefined,
   });
 

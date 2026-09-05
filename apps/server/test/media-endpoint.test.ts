@@ -2,6 +2,7 @@
 // acceptance): Range requests, Content-Type, caching headers, 404/410.
 
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { BlockList } from 'node:net';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -38,6 +39,28 @@ const dirs: string[] = [];
 const caches: MediaCache[] = [];
 
 describe('resolveMediaClientId', () => {
+  const trustedProxies = new BlockList();
+  trustedProxies.addAddress('172.18.0.1');
+  trustedProxies.addAddress('::1', 'ipv6');
+
+  it('ignores forged forwarding headers unless the socket peer is trusted', () => {
+    const input = { remoteAddress: '198.51.100.10', forwardedFor: '203.0.113.1' };
+    expect(resolveMediaClientId(input)).toBe('198.51.100.10');
+    expect(resolveMediaClientId(input, trustedProxies)).toBe('198.51.100.10');
+    expect(resolveMediaClientId({ forwardedFor: '203.0.113.1' }, trustedProxies)).toBe('unknown');
+  });
+
+  it.each(['172.18.0.1', '::ffff:172.18.0.1', '::1'])('trusts an allowlisted peer %s', (remoteAddress) => {
+    expect(resolveMediaClientId({ remoteAddress, forwardedFor: ' 2001:db8::1 ' }, trustedProxies))
+      .toBe('2001:db8::1');
+  });
+
+  it.each([undefined, '', 'invalid', '203.0.113.1:1234', '203.0.113.1, 198.51.100.1'])(
+    'falls back to the peer for a missing, invalid or chained header %s', (forwardedFor) => {
+      expect(resolveMediaClientId({ remoteAddress: '172.18.0.1', forwardedFor }, trustedProxies))
+        .toBe('172.18.0.1');
+    });
+
   it('uses the direct socket address', () => {
     expect(resolveMediaClientId({ remoteAddress: '198.51.100.10' })).toBe('198.51.100.10');
   });
@@ -316,6 +339,44 @@ describe('GET /media/:shareId/:key', () => {
     expect(limited.status).toBe(429);
     expect(limited.headers.get('Retry-After')).toBe('1');
   });
+
+  it.each(['172.18.0.1', '198.51.100.99'])(
+    'isolates forwarded clients only through the trusted peer, socket %s', async (remoteAddress) => {
+      const { db, dataDir, url } = await setup();
+      createShare(db, { id: 'share-b', ownerUserId: 'u2' });
+      linkMediaToShare(db, 'share-b', '12345');
+      finalizeShare(db, 'share-b');
+      const key = sanitizeMediaKey(createShareSanitizer(SECRET, 'share-b'), '12345');
+      const governor = new MediaRequestGovernor({
+        requestsPerMinute: 120,
+        requestBurst: 20,
+        bandwidthBytesPerSecond: 1024,
+        bandwidthBurstBytes: 1024,
+        now: () => 0,
+      });
+      const app = createServerApp({
+        db, sanitizeSecret: SECRET, dataDir, mediaGovernor: governor,
+        trustedProxyIps: ['172.18.0.1'],
+      });
+      const bindings = { incoming: { socket: { remoteAddress } } };
+      for (let i = 0; i < 20; i++) {
+        const response = await app.request(url, {
+          headers: { 'X-Forwarded-For': '203.0.113.1' },
+        }, bindings);
+        expect(response.status).toBe(200);
+        await response.arrayBuffer();
+      }
+      const sameClient = await app.request(`/media/share-b/${key}`, {
+        headers: { 'X-Forwarded-For': '203.0.113.1' },
+      }, bindings);
+      expect(sameClient.status).toBe(429);
+      const otherClient = await app.request(`/media/share-b/${key}`, {
+        headers: { 'X-Forwarded-For': '203.0.113.2' },
+      }, bindings);
+      expect(otherClient.status).toBe(remoteAddress === '172.18.0.1' ? 200 : 429);
+      await otherClient.arrayBuffer();
+      db.close();
+    });
 
   it('answers 404 for pending shares and 410 for revoked ones', async () => {
     const { db, app, fakeKey } = await setup();

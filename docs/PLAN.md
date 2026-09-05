@@ -391,6 +391,18 @@ it later.
   two Compose services, passes `/healthz`, serves the share frontend, and
   preserves `./data` across container recreation.
 
+**Deployment follow-up — `fix(server): isolate media limits behind trusted proxies`**
+
+- `TRUSTED_PROXY_IPS` explicitly allowlists exact socket peer IPs; an empty
+  list preserves direct-connection behavior.
+- Only an allowlisted peer may supply a single valid `X-Forwarded-For` IP.
+  The edge must overwrite the header; untrusted, invalid and chained values
+  fall back to the socket address.
+- Document Docker bridge gateway configuration and source-mode loopback peers.
+- Acceptance: visitors to different shares have independent client limits;
+  forged headers on untrusted connections cannot bypass those limits, and
+  per-share limits remain enforced.
+
 **Commit 21 — `docs: upstream sync procedure and license`**
 
 - docs/UPSTREAM.md: two upstream lines — (a) telegram-tt fork: small commits

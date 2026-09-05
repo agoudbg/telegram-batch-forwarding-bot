@@ -11,6 +11,7 @@ describe('loadServerConfig', () => {
   it('applies the bounded cache defaults', () => {
     expect(loadServerConfig(BASE_ENV)).toMatchObject({
       host: '127.0.0.1',
+      trustedProxyIps: [],
       port: 3000,
       internalMediaPort: 3001,
       internalMediaHost: '127.0.0.1',
@@ -35,6 +36,16 @@ describe('loadServerConfig', () => {
     expect(() => loadServerConfig({ ...BASE_ENV, INTERNAL_MEDIA_SECRET: '' })).toThrow(
       'INTERNAL_MEDIA_SECRET',
     );
+  });
+
+  it('accepts only explicit proxy IP addresses', () => {
+    expect(loadServerConfig({ ...BASE_ENV, TRUSTED_PROXY_IPS: ' 127.0.0.1, ::1 ' }).trustedProxyIps)
+      .toEqual(['127.0.0.1', '::1']);
+    expect(loadServerConfig({ ...BASE_ENV, TRUSTED_PROXY_IPS: ' ' }).trustedProxyIps).toEqual([]);
+    for (const value of ['true', '*', 'proxy.local', '172.18.0.0/16', '127.0.0.1,']) {
+      expect(() => loadServerConfig({ ...BASE_ENV, TRUSTED_PROXY_IPS: value }))
+        .toThrow('TRUSTED_PROXY_IPS');
+    }
   });
 
   it('rejects an invalid cache watermark', () => {
