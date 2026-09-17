@@ -3,6 +3,12 @@
   "private": true,
   "type": "module",
   "packageManager": "pnpm@10.32.0",
+  "author": {
+    "name": "agoudbg",
+    "email": "agoudbg@gmail.com"
+  },
+  "homepage": "https://github.com/agoudbg/telegram-batch-forwarding-bot",
+  "license": "GPL-3.0-or-later",
   "engines": {
     "node": ">=22"
   },
