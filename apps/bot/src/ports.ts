@@ -12,6 +12,8 @@ export interface NormalizedMessage {
   text: string;
   isPrivate: boolean;
   isForward: boolean;
+  /** Text of the message being replied to, when it is available. */
+  replyToText?: string;
   groupedId?: string;
   /** Serialized TL JSON of the whole message (tlbridge serializeTL) */
   tlJson: TLJsonObject;

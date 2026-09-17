@@ -9,6 +9,7 @@ import {
   buildShareLinks,
   buildShareReply,
   createShareId,
+  extractShareId,
   isValidShareId,
   parseGetPayload,
 } from '../src/shares.js';
@@ -76,6 +77,26 @@ describe('isValidShareId', () => {
     expect(isValidShareId('')).toBe(false);
     expect(isValidShareId('contains space')).toBe(false);
     expect(isValidShareId('a'.repeat(33))).toBe(false);
+  });
+});
+
+describe('extractShareId', () => {
+  it('extracts ids from share URLs and Mini App links', () => {
+    expect(extractShareId('share_abc')).toBe('share_abc');
+    expect(extractShareId('https://share.example.com/s/share_abc')).toBe('share_abc');
+    expect(extractShareId('📱 https://t.me/mybot/view?startapp=share_abc')).toBe('share_abc');
+    expect(extractShareId('See https://share.example.com/s/share_abc/?utm_source=telegram.')).toBe(
+      'share_abc',
+    );
+    expect(extractShareId('📱 https://t.me/mybot/view?foo=1&startapp=share_abc&bar=2')).toBe(
+      'share_abc',
+    );
+  });
+
+  it('rejects unrelated or malformed text', () => {
+    expect(extractShareId('https://example.com/s/share_abc')).toBe('share_abc');
+    expect(extractShareId('https://share.example.com/s/' + 'a'.repeat(33))).toBeNull();
+    expect(extractShareId('not a share link')).toBeNull();
   });
 });
 

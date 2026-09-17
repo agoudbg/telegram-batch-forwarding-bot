@@ -54,13 +54,14 @@ function fakePorts() {
   return { ports, texts, docs, deleted };
 }
 
-function commandMessage(chatId: string, text: string): NormalizedMessage {
+function commandMessage(chatId: string, text: string, replyToText?: string): NormalizedMessage {
   return {
     chatId,
     messageId: 1,
     text,
     isPrivate: true,
     isForward: false,
+    replyToText,
     tlJson: { className: 'Message' },
     raw: undefined,
   };
@@ -110,7 +111,6 @@ function largeDocument(docId: string, withRef = true): TLJsonObject {
     },
   };
 }
-
 
 async function setup() {
   const dataDir = await mkdtemp(path.join(tmpdir(), 'tbfb-app-'));
@@ -326,6 +326,27 @@ describe('BotApp', () => {
 
     await app.handleMessage(commandMessage('u1', '/delete share_1'));
     expect(getShare(db, 'share_1')?.status).toBe('revoked');
+  });
+
+  it('/delete accepts a share link and the replied creation message', async () => {
+    const { app, db, texts } = await trackedSetup();
+    await app.handleMessage(forwardMessage('u1', 1, 100));
+    await app.handleDoneCallback('u1');
+
+    await app.handleMessage(commandMessage('u1', ' /delete https://share.example.com/s/share_1 '));
+    expect(getShare(db, 'share_1')?.status).toBe('revoked');
+
+    await app.handleMessage(forwardMessage('u1', 2, 100));
+    await app.handleDoneCallback('u1');
+    await app.handleMessage(
+      commandMessage(
+        'u1',
+        '/delete',
+        '✅ Batch ready\n\n🔗 https://share.example.com/s/share_2\n📱 https://t.me/mybot/view?startapp=share_2',
+      ),
+    );
+    expect(getShare(db, 'share_2')?.status).toBe('revoked');
+    expect(texts.at(-1)!.text).toContain('share_2 revoked');
   });
 
   it('rejects invalid deep-link and delete arguments without querying storage', async () => {

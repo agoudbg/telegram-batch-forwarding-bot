@@ -18,7 +18,8 @@ pipeline.
   support and keeps a bounded 24-hour/5 GiB local cache.
 - Serves public pages with share-scoped fake ids and no media access hashes,
   file references or Telegram data-center ids.
-- Revokes shares through `/delete <shareId>`.
+- Revokes shares through `/delete <shareId or link>`, including by replying to
+  the bot's share-creation message.
 
 ## Architecture
 
@@ -135,7 +136,8 @@ HTTP origins are accepted there, which makes local Mini App testing easier.
 2. Forward more messages before the silence window expires, or tap
    **Done - generate link** when the batch is complete.
 3. Open the browser link or Mini App link from the bot's reply.
-4. Use `/delete <shareId>` to revoke a published share. Use `/cancel` to
+4. Use `/delete <shareId or link>` to revoke a published share. You can also
+   reply to the bot's creation message with `/delete`. Use `/cancel` to
    discard the batch currently being collected.
 
 The `/help` and `/privacy` commands provide the same core guidance in the

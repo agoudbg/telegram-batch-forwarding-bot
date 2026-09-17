@@ -112,9 +112,11 @@ async function main(): Promise<void> {
 
   client.addEventHandler(
     (event: events.NewMessageEvent) => {
-      void app.handleMessage(normalizeMessage(event)).catch((error: unknown) => {
-        console.error('[bot] message handler failed:', error);
-      });
+      void normalizeMessage(event)
+        .then((message) => app.handleMessage(message))
+        .catch((error: unknown) => {
+          console.error('[bot] message handler failed:', error);
+        });
     },
     new events.NewMessage({ incoming: true }),
   );
@@ -183,7 +185,6 @@ function createTeleprotoPorts(client: TelegramClient): BotPorts {
       if (Array.isArray(entity)) return null;
       return resolvedPeerFromEntity(entity);
     },
-
   };
 }
 
@@ -249,19 +250,41 @@ function buildButtons(opts: SendTextOptions): Api.ReplyInlineMarkup | undefined 
   });
 }
 
-function normalizeMessage(event: events.NewMessageEvent): NormalizedMessage {
+async function normalizeMessage(event: events.NewMessageEvent): Promise<NormalizedMessage> {
   const message = event.message;
   const text = typeof message.message === 'string' ? message.message : '';
+  const replyToText = event.isPrivate ? await getReplyToText(message, text) : undefined;
   return {
     chatId: message.senderId?.toString() ?? '',
     messageId: message.id,
     text,
     isPrivate: event.isPrivate === true,
     isForward: message.fwdFrom !== undefined && message.fwdFrom !== null,
+    replyToText,
     groupedId: message.groupedId?.toString(),
     tlJson: serializeTL(message) as TLJsonObject,
     raw: message,
   };
+}
+
+/** Load only the replied message needed by `/delete`; other replies stay local. */
+async function getReplyToText(
+  message: Api.Message,
+  commandText: string,
+): Promise<string | undefined> {
+  if (!/^\/delete(?:\s|$)/i.test(commandText.trim()) || message.replyTo === undefined) {
+    return undefined;
+  }
+
+  try {
+    const reply = await message.getReplyMessage();
+    if (reply === undefined) return undefined;
+    if (typeof reply.message === 'string') return reply.message;
+    return typeof reply.text === 'string' ? reply.text : undefined;
+  } catch (error) {
+    console.error('[bot] failed to load replied message:', error);
+    return undefined;
+  }
 }
 
 main().catch((error: unknown) => {

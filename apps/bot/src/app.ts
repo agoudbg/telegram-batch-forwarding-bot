@@ -26,7 +26,7 @@ import {
   buildShareLinks,
   buildShareReply,
   createShareId,
-  isValidShareId,
+  extractShareId,
   parseGetPayload,
 } from './shares.js';
 
@@ -44,12 +44,12 @@ const HELP_TEXT = [
   '3. Anyone with the link can view the batch in a browser or Mini App.',
   '',
   '/cancel — drop the batch currently being collected',
-  '/delete <shareId> — revoke a share (the page goes 404)',
+  '/delete <shareId or link> — revoke a share (the page goes 404)',
 ].join('\n');
 
 const PRIVACY_TEXT = [
   'Share pages are PUBLIC by design: anyone with the link can read the full message text and origin names.',
-  'The link id is random and unguessable. Use /delete <shareId> to revoke a share at any time.',
+  'The link id is random and unguessable. Use /delete <shareId or link> to revoke a share at any time.',
   'Your identity as the forwarder is never exposed on the page.',
 ].join('\n');
 
@@ -58,11 +58,7 @@ const FALLBACK_RATE_LIMIT_MS = 3000;
 export interface BotAppDeps {
   config: Pick<
     BotConfig,
-    | 'publicOrigin'
-    | 'botUsername'
-    | 'miniAppShortName'
-    | 'batchSilenceMs'
-    | 'mediaCacheMaxBytes'
+    'publicOrigin' | 'botUsername' | 'miniAppShortName' | 'batchSilenceMs' | 'mediaCacheMaxBytes'
   >;
   db: StorageDatabase;
   ports: BotPorts;
@@ -145,7 +141,7 @@ export class BotApp {
 
     const text = msg.text.trim();
     if (text.startsWith('/')) {
-      await this.handleCommand(msg.chatId, text);
+      await this.handleCommand(msg.chatId, text, msg.replyToText);
       return;
     }
 
@@ -160,7 +156,7 @@ export class BotApp {
     return this.batches.finishNow(chatId);
   }
 
-  private async handleCommand(chatId: string, text: string): Promise<void> {
+  private async handleCommand(chatId: string, text: string, replyToText?: string): Promise<void> {
     const [command = '', ...rest] = text.split(/\s+/);
     const arg = rest.join(' ');
 
@@ -194,18 +190,19 @@ export class BotApp {
         return;
       }
       case '/delete': {
-        if (!isValidShareId(arg)) {
-          await this.deps.ports.sendText(chatId, 'Usage: /delete <shareId>');
+        const shareId = extractShareId(arg) ?? extractShareId(replyToText ?? '');
+        if (shareId === null) {
+          await this.deps.ports.sendText(chatId, 'Usage: /delete <shareId or link>');
           return;
         }
         try {
-          const revoked = revokeShare(this.deps.db, arg, chatId);
+          const revoked = revokeShare(this.deps.db, shareId, chatId);
           await this.deps.ports.sendText(
             chatId,
-            revoked ? `🗑 Share ${arg} revoked.` : 'Share not found (or not yours).',
+            revoked ? `🗑 Share ${shareId} revoked.` : 'Share not found (or not yours).',
           );
         } catch (error) {
-          this.deps.log?.(`share revoke failed for ${arg}: ${String(error)}`);
+          this.deps.log?.(`share revoke failed for ${shareId}: ${String(error)}`);
           await this.deps.ports
             .sendText(chatId, 'Could not revoke that share right now. Please try again later.')
             .catch(() => undefined);

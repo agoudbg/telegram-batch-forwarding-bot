@@ -26,6 +26,7 @@ export {
   buildShareLinks,
   buildShareReply,
   createShareId,
+  extractShareId,
   isValidShareId,
   parseGetPayload,
 } from './shares.js';

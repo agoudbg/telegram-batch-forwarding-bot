@@ -6,6 +6,8 @@ import { randomBytes } from 'node:crypto';
 const MAX_SHARE_ID_LENGTH = 32;
 const MAX_DEEP_LINK_PAYLOAD_LENGTH = 64;
 const SHARE_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
+const URL_PATTERN = /https?:\/\/[^\s<>"'`]+/gi;
+const TRAILING_LINK_PUNCTUATION = /[.,!?;:)\]}>'"]+$/;
 
 /** Random unguessable share id (§2.8: share pages are public by default, so
  *  the id is the capability). 72 bits of entropy, URL-safe. */
@@ -64,10 +66,37 @@ export function parseGetPayload(payload: string): { shareId: string; seq: number
 
 export function isValidShareId(shareId: string): boolean {
   return (
-    shareId.length > 0 &&
-    shareId.length <= MAX_SHARE_ID_LENGTH &&
-    SHARE_ID_PATTERN.test(shareId)
+    shareId.length > 0 && shareId.length <= MAX_SHARE_ID_LENGTH && SHARE_ID_PATTERN.test(shareId)
   );
+}
+
+/** Extract a share id from a bare id, a public share URL or a Mini App link. */
+export function extractShareId(input: string): string | null {
+  const trimmed = input.trim();
+  if (isValidShareId(trimmed)) return trimmed;
+
+  const urls = input.match(URL_PATTERN) ?? [];
+  for (const rawUrl of urls) {
+    const candidate = rawUrl.replace(TRAILING_LINK_PUNCTUATION, '');
+    let url: URL;
+    try {
+      url = new URL(candidate);
+    } catch {
+      continue;
+    }
+
+    const pathParts = url.pathname.split('/').filter(Boolean);
+    const shareMarkerIndex = pathParts.lastIndexOf('s');
+    if (shareMarkerIndex === pathParts.length - 2) {
+      const shareId = pathParts[pathParts.length - 1]!;
+      if (isValidShareId(shareId)) return shareId;
+    }
+
+    const miniAppId = url.searchParams.get('startapp');
+    if (miniAppId !== null && isValidShareId(miniAppId)) return miniAppId;
+  }
+
+  return null;
 }
 
 /** Per-key fixed-interval rate limiter (one action per interval per key). */
