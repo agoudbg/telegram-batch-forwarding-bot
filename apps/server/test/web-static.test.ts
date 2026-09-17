@@ -48,10 +48,12 @@ afterAll(async () => {
 });
 
 describe('built web routes', () => {
-  it('serves the index at the root and share routes', async () => {
+  it('redirects the root to the project homepage and serves share routes', async () => {
     const root = await app.request('/');
-    expect(root.status).toBe(200);
-    await expect(root.text()).resolves.toContain('share app');
+    expect(root.status).toBe(302);
+    expect(root.headers.get('Location')).toBe(
+      'https://github.com/agoudbg/telegram-batch-forwarding-bot',
+    );
 
     const share = await app.request(
       'http://127.0.0.1:3000/s/share-a?utm_source=telegram',
@@ -80,7 +82,10 @@ describe('built web routes', () => {
     await expect(asset.text()).resolves.toContain('share app');
 
     const missing = await app.request('/missing');
-    expect(missing.status).toBe(404);
+    expect(missing.status).toBe(302);
+    expect(missing.headers.get('Location')).toBe(
+      'https://github.com/agoudbg/telegram-batch-forwarding-bot',
+    );
   });
 
   it('keeps API and media routes ahead of static files', async () => {

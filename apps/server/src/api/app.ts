@@ -23,6 +23,8 @@ import { isMediaWithinHostingLimit, registerMediaRoutes } from './media.js';
 import { createShareSanitizer, sanitizeMediaKey } from './sanitize.js';
 import { renderSharePreviewHtml } from './sharePreview.js';
 
+const PROJECT_GITHUB_URL = 'https://github.com/agoudbg/telegram-batch-forwarding-bot';
+
 export interface ShareResponse {
   share: {
     id: string;
@@ -177,7 +179,7 @@ function registerWebRoutes(app: Hono, webRoot: string, publicOrigin?: string): v
     c.header('X-Robots-Tag', 'noindex, nofollow');
     await next();
   });
-  app.get('/', serveStatic({ path: indexPath }));
+  app.get('/', (c) => c.redirect(PROJECT_GITHUB_URL));
   const serveSharePreview = async (c: import('hono').Context) => {
     return c.html(renderSharePreviewHtml(await indexTemplate, c.req.url, publicOrigin));
   };
@@ -185,4 +187,5 @@ function registerWebRoutes(app: Hono, webRoot: string, publicOrigin?: string): v
   app.get('/s/:id/', serveSharePreview);
   app.get('/s/*', serveStatic({ path: indexPath }));
   app.use('*', serveStatic({ root: webRoot }));
+  app.get('*', (c) => c.redirect(PROJECT_GITHUB_URL));
 }
