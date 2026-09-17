@@ -66,6 +66,7 @@ function main(): void {
     sanitizeSecret: config.sanitizeSecret,
     dataDir: config.dataDir,
     botUsername: config.botUsername,
+    publicOrigin: config.publicOrigin,
     mediaCache,
     maxHostedMediaBytes: config.mediaCacheMaxBytes,
     mediaGovernor,

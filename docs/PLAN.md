@@ -385,6 +385,9 @@ it later.
   and TLS management remain outside the repository.
 - Share HTML responses declare `noindex, nofollow`; `PUBLIC_ORIGIN` is passed
   into the frontend build automatically.
+- Share routes replace inherited Telegram Web metadata with a stable
+  share-view title, description, canonical URL, Open Graph fields and Twitter
+  card fields before returning the built HTML to crawlers.
 - Document both source and Docker workflows, health checks, persistent data,
   the shared internal media secret, and the update procedure.
 - Acceptance: a clean Linux or WSL machine builds the root image, starts the

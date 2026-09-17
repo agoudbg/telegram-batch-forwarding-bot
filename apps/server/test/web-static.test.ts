@@ -15,13 +15,29 @@ let app!: ReturnType<typeof createServerApp>;
 beforeAll(async () => {
   webRoot = await mkdtemp(path.join(tmpdir(), 'tbfb-web-'));
   await mkdir(path.join(webRoot, 'assets'));
-  await writeFile(path.join(webRoot, 'index.html'), '<html><body>share app</body></html>');
+  await writeFile(
+    path.join(webRoot, 'index.html'),
+    '<html><head><title>Telegram Web</title>' +
+      '<meta name="title" content="Telegram Web">' +
+      '<meta name="description" content="Telegram Web description">' +
+      '<meta name="robots" content="index, follow">' +
+      '<meta name="application-name" content="Telegram Web">' +
+      '<meta name="mobile-web-app-title" content="Telegram Web">' +
+      '<meta name="apple-mobile-web-app-title" content="Telegram Web">' +
+      '<meta property="og:title" content="Original Telegram Web preview">' +
+      '<meta name="twitter:description" content="Original preview">' +
+      '<meta property="og:image" content="https://web.telegram.org/icon.png">' +
+      '<meta property="twitter:image" content="https://web.telegram.org/icon.png">' +
+      '<link rel="canonical" href="https://web.telegram.org/k/">' +
+      '</head><body><noscript><h1>Telegram Web</h1></noscript>share app</body></html>',
+  );
   await writeFile(path.join(webRoot, 'assets', 'app.js'), 'console.log("share app");');
   db = openDatabase(':memory:');
   app = createServerApp({
     db,
     sanitizeSecret: 'test-secret',
     dataDir: webRoot,
+    publicOrigin: 'https://shares.example.com',
     webRoot,
   });
 });
@@ -37,10 +53,25 @@ describe('built web routes', () => {
     expect(root.status).toBe(200);
     await expect(root.text()).resolves.toContain('share app');
 
-    const share = await app.request('/s/share-a');
+    const share = await app.request(
+      'http://127.0.0.1:3000/s/share-a?utm_source=telegram',
+    );
     expect(share.status).toBe(200);
     expect(share.headers.get('X-Robots-Tag')).toBe('noindex, nofollow');
-    await expect(share.text()).resolves.toContain('share app');
+    const shareHtml = await share.text();
+    expect(shareHtml).toContain('share app');
+    expect(shareHtml).toContain('<title>Shared Message</title>');
+    expect(shareHtml).toContain('property="og:url" content="https://shares.example.com/s/share-a"');
+    expect(shareHtml).toContain('rel="canonical" href="https://shares.example.com/s/share-a"');
+    expect(shareHtml).toContain('name="twitter:card" content="summary"');
+    expect(shareHtml).not.toContain('Telegram Web');
+    expect(shareHtml).not.toContain('https://web.telegram.org/k/');
+
+    const trailingSlash = await app.request(
+      'http://127.0.0.1:3000/s/share-a/?utm_source=telegram',
+    );
+    expect(trailingSlash.status).toBe(200);
+    await expect(trailingSlash.text()).resolves.not.toContain('Telegram Web');
   });
 
   it('serves built assets without using the share fallback', async () => {

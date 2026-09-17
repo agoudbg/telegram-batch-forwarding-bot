@@ -5,6 +5,7 @@
 // unknown or still-pending shares are indistinguishable (404), revoked
 // shares answer 410 Gone.
 
+import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import { serveStatic } from '@hono/node-server/serve-static';
@@ -20,6 +21,7 @@ import type { PeerKind } from '../storage/repository.js';
 import { checkShareAccess } from './gate.js';
 import { isMediaWithinHostingLimit, registerMediaRoutes } from './media.js';
 import { createShareSanitizer, sanitizeMediaKey } from './sanitize.js';
+import { renderSharePreviewHtml } from './sharePreview.js';
 
 export interface ShareResponse {
   share: {
@@ -74,6 +76,8 @@ export interface ServerAppDeps {
   dataDir: string;
   /** Bot username for unhosted-media deep links; omit to disable the button */
   botUsername?: string;
+  /** Public origin used for canonical and social preview URLs. */
+  publicOrigin?: string;
   mediaCache?: MediaCache;
   maxHostedMediaBytes?: number;
   mediaGovernor?: MediaRequestGovernor;
@@ -158,19 +162,27 @@ export function createServerApp(deps: ServerAppDeps): Hono {
   });
 
   registerMediaRoutes(app, deps);
-  if (deps.webRoot !== undefined) registerWebRoutes(app, deps.webRoot);
+  if (deps.webRoot !== undefined) {
+    registerWebRoutes(app, deps.webRoot, deps.publicOrigin);
+  }
 
   return app;
 }
 
-function registerWebRoutes(app: Hono, webRoot: string): void {
+function registerWebRoutes(app: Hono, webRoot: string, publicOrigin?: string): void {
   const indexPath = path.join(webRoot, 'index.html');
+  const indexTemplate = readFile(indexPath, 'utf8');
 
   app.use('/s/*', async (c, next) => {
     c.header('X-Robots-Tag', 'noindex, nofollow');
     await next();
   });
   app.get('/', serveStatic({ path: indexPath }));
+  const serveSharePreview = async (c: import('hono').Context) => {
+    return c.html(renderSharePreviewHtml(await indexTemplate, c.req.url, publicOrigin));
+  };
+  app.get('/s/:id', serveSharePreview);
+  app.get('/s/:id/', serveSharePreview);
   app.get('/s/*', serveStatic({ path: indexPath }));
   app.use('*', serveStatic({ root: webRoot }));
 }

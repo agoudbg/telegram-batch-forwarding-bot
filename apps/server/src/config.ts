@@ -11,6 +11,8 @@ export interface ServerConfig {
   /** Interface exposed by the public HTTP server. Defaults to loopback. */
   host: string;
   port: number;
+  /** Public origin used for canonical and social preview URLs. */
+  publicOrigin?: string;
   /** Server-side secret keying the per-share fake-id HMAC. Combined with the
    *  share id it forms the sanitizer's shareSecret, so fake ids cannot be
    *  recomputed offline from a leaked share id (docs/PLAN.md §2.6). */
@@ -79,6 +81,7 @@ export function loadServerConfig(env: NodeJS.ProcessEnv = process.env): ServerCo
     dataDir: env.DATA_DIR || './data',
     host: env.HOST || '127.0.0.1',
     port,
+    publicOrigin: env.PUBLIC_ORIGIN?.trim().replace(/\/+$/, '') || undefined,
     sanitizeSecret,
     botUsername: env.BOT_USERNAME?.replace(/^@/, '') || undefined,
     internalMediaPort: positiveInt(env, 'INTERNAL_MEDIA_PORT', DEFAULT_INTERNAL_MEDIA_PORT),

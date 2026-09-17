@@ -62,6 +62,13 @@ describe('loadServerConfig', () => {
     expect(loadServerConfig({ ...BASE_ENV, HOST: '0.0.0.0' }).host).toBe('0.0.0.0');
   });
 
+  it('normalizes the public origin used by share previews', () => {
+    expect(
+      loadServerConfig({ ...BASE_ENV, PUBLIC_ORIGIN: 'https://shares.example.com///' })
+        .publicOrigin,
+    ).toBe('https://shares.example.com');
+  });
+
   it('accepts a separate media origin host for container networking', () => {
     expect(
       loadServerConfig({ ...BASE_ENV, INTERNAL_MEDIA_HOST: 'bot' }).internalMediaHost,
