@@ -22,7 +22,7 @@ native Linux or WSL for image builds and runtime checks.
 Clone the repository with its WebA submodule:
 
 ```bash
-git clone --recurse-submodules <repository-url> telegram-batch-forwarding-bot
+git clone --recurse-submodules https://github.com/agoudbg/telegram-batch-forwarding-bot.git telegram-batch-forwarding-bot
 cd telegram-batch-forwarding-bot
 cp .env.example .env
 mkdir -p data
