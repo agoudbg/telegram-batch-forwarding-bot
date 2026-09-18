@@ -155,6 +155,7 @@ web-e2e:
 
 web-verify:
 	$(NPM) --prefix $(WEB_DIR) run check:ts
+	$(NPM) --prefix $(WEB_DIR) run check:css
 	$(NPM) --prefix $(WEB_DIR) test
 	$(NPM) --prefix $(WEB_DIR) run build:share
 	$(NPM) --prefix $(WEB_DIR) run test:playwright
