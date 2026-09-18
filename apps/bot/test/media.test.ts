@@ -50,7 +50,7 @@ describe('extractMediaInfo', () => {
   it('extracts photos', () => {
     expect(extractMediaInfo(photoMessage('555'))).toEqual({
       kind: 'photo',
-      key: '555',
+      key: 'photo_555',
       mime: 'image/jpeg',
       size: 5000,
       photoRef: { id: '555', accessHash: '888', fileReference: 'cGhvdG8=' },
@@ -62,7 +62,7 @@ describe('extractMediaInfo', () => {
     const info = extractMediaInfo(documentMessage('777', 12345));
     expect(info).toMatchObject({
       kind: 'document',
-      key: '777',
+      key: 'document_777',
       size: 12345,
       mime: 'video/mp4',
       width: 640,
@@ -199,7 +199,7 @@ describe('MediaPipeline', () => {
 
     expect(result).toMatchObject({ hosted: 1, unhosted: 2, failed: 0 });
 
-    const hostedDoc = getMedia(db, 'd1');
+    const hostedDoc = getMedia(db, 'document_d1');
     expect(hostedDoc).toMatchObject({
       hosted: true,
       path: null,
@@ -209,7 +209,7 @@ describe('MediaPipeline', () => {
       thumbPath: null,
     });
 
-    const big = getMedia(db, 'big1');
+    const big = getMedia(db, 'document_big1');
     expect(big?.hosted).toBe(false);
     expect(big?.path).toBeNull();
     expect(JSON.parse(big!.reference!)).toEqual({
@@ -217,7 +217,7 @@ describe('MediaPipeline', () => {
       accessHash: '999',
       fileReference: 'aGk=',
     });
-    expect(listMediaSources(db, 'big1')[0]).toMatchObject({
+    expect(listMediaSources(db, 'document_big1')[0]).toMatchObject({
       kind: 'document',
       sourcePeerId: 'u1',
       sourceMessageId: 3,
@@ -231,11 +231,11 @@ describe('MediaPipeline', () => {
     );
     expect(result).toMatchObject({ unhosted: 1, failed: 0 });
 
-    const row = getMedia(db, 'noref');
+    const row = getMedia(db, 'document_noref');
     expect(row?.hosted).toBe(false);
     expect(row?.path).toBeNull();
     expect(row?.reference).toBeNull();
-    expect(listMediaSources(db, 'noref')).toHaveLength(1);
+    expect(listMediaSources(db, 'document_noref')).toHaveLength(1);
   });
 
   it('dedups repeated media keys without re-downloading', async () => {
@@ -243,8 +243,19 @@ describe('MediaPipeline', () => {
     const b = batch([{ tlJson: photoMessage('p1') }, { tlJson: photoMessage('p1') }]);
     const result = await pipeline.processBatch(b);
     expect(result).toMatchObject({ unhosted: 1, deduped: 1 });
-    expect(getMedia(db, 'p1')).not.toBeNull();
-    expect(listMediaSources(db, 'p1')).toHaveLength(2);
+    expect(getMedia(db, 'photo_p1')).not.toBeNull();
+    expect(listMediaSources(db, 'photo_p1')).toHaveLength(2);
+  });
+
+  it('keeps photo and document ids in separate media namespaces', async () => {
+    const { db, pipeline } = await setup();
+    await pipeline.processBatch(batch([
+      { tlJson: photoMessage('same') },
+      { tlJson: documentMessage('same', 500) },
+    ]));
+
+    expect(getMedia(db, 'photo_same')).not.toBeNull();
+    expect(getMedia(db, 'document_same')).not.toBeNull();
   });
 
   it('resolves origin avatars and skips unresolvable peers', async () => {

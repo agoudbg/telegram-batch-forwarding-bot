@@ -387,7 +387,7 @@ describe('BotApp', () => {
     await app.handleMessage(forwardMessage('u1', 1, 100, largeDocument('1001')));
     await app.handleDoneCallback('u1');
 
-    const media = getMedia(db, '1001');
+    const media = getMedia(db, 'document_1001');
     expect(media?.hosted).toBe(false);
     expect(media?.path).toBeNull();
 
@@ -410,7 +410,7 @@ describe('BotApp', () => {
     await app.handleMessage(forwardMessage('u1', 1, 100, largeDocument('1002', false)));
     await app.handleDoneCallback('u1');
 
-    const media = getMedia(db, '1002');
+    const media = getMedia(db, 'document_1002');
     expect(media?.hosted).toBe(false);
     expect(media?.reference).toBeNull();
 

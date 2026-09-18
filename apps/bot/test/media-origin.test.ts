@@ -30,9 +30,9 @@ afterAll(async () => {
 describe('media origin', () => {
   it('retrieves the exact known message id before downloading media', async () => {
     const db = openDatabase(':memory:');
-    insertMediaIfAbsent(db, { key: '123', hosted: true, mime: 'text/plain', size: 999 });
+    insertMediaIfAbsent(db, { key: 'document_123', hosted: true, mime: 'text/plain', size: 999 });
     upsertMediaSource(db, {
-      mediaKey: '123',
+      mediaKey: 'document_123',
       kind: 'document',
       sourcePeerId: '42',
       sourceMessageId: 77,
@@ -83,14 +83,14 @@ describe('media origin', () => {
     if (address === null || typeof address === 'string') throw new Error('Expected a TCP address');
 
     const response = await fetch(
-      `http://127.0.0.1:${address.port}/internal/media/123?variant=full`,
+      `http://127.0.0.1:${address.port}/internal/media/document_123?variant=full`,
       { headers: { Authorization: 'Bearer test-secret' } },
     );
     expect(response.status).toBe(200);
     expect(response.headers.get('Content-Length')).toBeNull();
     expect(await response.text()).toBe('hello');
     expect(requestedId).toBe(77);
-    expect(JSON.parse(getMedia(db, '123')!.reference!)).toMatchObject({
+    expect(JSON.parse(getMedia(db, 'document_123')!.reference!)).toMatchObject({
       id: '123',
       accessHash: '456',
       fileReference: Buffer.from('reference').toString('base64'),

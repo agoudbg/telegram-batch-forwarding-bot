@@ -15,6 +15,7 @@ import {
   updateMediaReference,
   upsertMediaSource,
 } from '@tbfb/server';
+import { mediaKeyFor } from './media.js';
 
 export interface MediaOriginOptions {
   db: StorageDatabase;
@@ -169,10 +170,10 @@ async function findSourceMessage(
 function mediaId(message: Api.Message): string | null {
   const media = message.media;
   if (media instanceof Api.MessageMediaDocument && media.document instanceof Api.Document) {
-    return media.document.id.toString();
+    return mediaKeyFor('document', media.document.id.toString());
   }
   if (media instanceof Api.MessageMediaPhoto && media.photo instanceof Api.Photo) {
-    return media.photo.id.toString();
+    return mediaKeyFor('photo', media.photo.id.toString());
   }
   return null;
 }

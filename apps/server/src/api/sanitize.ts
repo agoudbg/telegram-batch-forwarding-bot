@@ -24,12 +24,14 @@ export function createShareSanitizer(sanitizeSecret: string, shareId: string): T
   });
 }
 
-/** Public (fake) form of a media key. Document/photo keys are the real
- *  entity id and map through fakeId — matching the sanitized `id` the
- *  frontend sees on Photo/Document objects. Avatar keys embed the real peer
- *  id, so only the embedded id is remapped. */
+/** Public (fake) form of a media key. Typed document/photo keys preserve
+ *  their namespace while matching the sanitized entity id the frontend sees.
+ *  Legacy bare and avatar keys remain readable. */
 export function sanitizeMediaKey(sanitizer: TLSanitizer, key: string): string {
   const AVATAR_PREFIX = 'avatar_';
+  const typedMedia = /^(photo|document)_(\d+)$/.exec(key);
+  if (typedMedia !== null) return `${typedMedia[1]}_${sanitizer.fakeId(typedMedia[2]!)}`;
+
   return key.startsWith(AVATAR_PREFIX)
     ? `${AVATAR_PREFIX}${sanitizer.fakeId(key.slice(AVATAR_PREFIX.length))}`
     : sanitizer.fakeId(key);

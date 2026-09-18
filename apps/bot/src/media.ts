@@ -19,7 +19,7 @@ import type { BotPorts, InputDocumentRef, InputPhotoRef } from './ports.js';
 
 export interface MediaInfo {
   kind: 'photo' | 'document';
-  /** Document/photo id as a decimal string; also the media table key */
+  /** Type-prefixed media table key, e.g. `photo_<id>` or `document_<id>`. */
   key: string;
   size?: number;
   mime?: string;
@@ -48,6 +48,10 @@ function longToNumber(value: TLJsonValue | undefined): number | undefined {
   return asString === undefined ? undefined : Number(asString);
 }
 
+export function mediaKeyFor(kind: 'photo' | 'document', id: string): string {
+  return `${kind}_${id}`;
+}
+
 /** Extract download-relevant media info from a serialized TL JSON message. */
 export function extractMediaInfo(tlJson: TLJsonObject): MediaInfo | null {
   const media = asObject(tlJson.media);
@@ -56,8 +60,8 @@ export function extractMediaInfo(tlJson: TLJsonObject): MediaInfo | null {
   if (media.className === 'MessageMediaPhoto') {
     const photo = asObject(media.photo);
     if (photo?.className !== 'Photo') return null;
-    const key = idToString(photo.id);
-    if (key === undefined) return null;
+    const id = idToString(photo.id);
+    if (id === undefined) return null;
     const accessHash = idToString(photo.accessHash);
     const fileReference = asObject(photo.fileReference);
     const sizes = Array.isArray(photo.sizes) ? photo.sizes : [];
@@ -65,12 +69,12 @@ export function extractMediaInfo(tlJson: TLJsonObject): MediaInfo | null {
     const largestSize = asObject(largest);
     return {
       kind: 'photo',
-      key,
+      key: mediaKeyFor('photo', id),
       mime: 'image/jpeg',
       size: typeof largestSize?.size === 'number' ? largestSize.size : undefined,
       photoRef:
         accessHash !== undefined && typeof fileReference?.$bytes === 'string'
-          ? { id: key, accessHash, fileReference: fileReference.$bytes }
+          ? { id, accessHash, fileReference: fileReference.$bytes }
           : undefined,
       hasThumbnail: sizes.length >= 2,
     };
@@ -79,12 +83,12 @@ export function extractMediaInfo(tlJson: TLJsonObject): MediaInfo | null {
   if (media.className === 'MessageMediaDocument') {
     const doc = asObject(media.document);
     if (doc?.className !== 'Document') return null;
-    const key = idToString(doc.id);
-    if (key === undefined) return null;
+    const id = idToString(doc.id);
+    if (id === undefined) return null;
 
     const info: MediaInfo = {
       kind: 'document',
-      key,
+      key: mediaKeyFor('document', id),
       size: longToNumber(doc.size),
       mime: typeof doc.mimeType === 'string' ? doc.mimeType : undefined,
       hasThumbnail: Array.isArray(doc.thumbs) && doc.thumbs.length > 0,
@@ -108,7 +112,7 @@ export function extractMediaInfo(tlJson: TLJsonObject): MediaInfo | null {
     const accessHash = idToString(doc.accessHash);
     const fileReference = asObject(doc.fileReference);
     if (accessHash !== undefined && typeof fileReference?.$bytes === 'string') {
-      info.documentRef = { id: key, accessHash, fileReference: fileReference.$bytes };
+      info.documentRef = { id, accessHash, fileReference: fileReference.$bytes };
     }
     return info;
   }
