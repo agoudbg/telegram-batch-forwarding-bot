@@ -25,6 +25,7 @@ export interface ServerConfig {
   internalMediaHost: string;
   internalMediaSecret: string;
   mediaWebMaxBytes: number;
+  mediaCacheEnabled: boolean;
   mediaCacheMaxBytes: number;
   mediaCacheLowWatermarkBytes: number;
   mediaCacheTtlSeconds: number;
@@ -51,6 +52,14 @@ function positiveInt(env: NodeJS.ProcessEnv, name: string, fallback: number): nu
     throw new Error(`Environment variable ${name} must be a positive integer, got ${raw}`);
   }
   return value;
+}
+
+function booleanFlag(env: NodeJS.ProcessEnv, name: string, fallback: boolean): boolean {
+  const raw = env[name];
+  if (raw === undefined || raw === '') return fallback;
+  if (/^(1|true|yes|on)$/i.test(raw)) return true;
+  if (/^(0|false|no|off)$/i.test(raw)) return false;
+  throw new Error(`Environment variable ${name} must be a boolean, got ${raw}`);
 }
 
 export function loadServerConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
@@ -103,6 +112,7 @@ export function loadServerConfig(env: NodeJS.ProcessEnv = process.env): ServerCo
           })()
         : env.INTERNAL_MEDIA_SECRET,
     mediaWebMaxBytes,
+    mediaCacheEnabled: booleanFlag(env, 'MEDIA_CACHE_ENABLED', true),
     mediaCacheMaxBytes,
     mediaCacheLowWatermarkBytes,
     mediaCacheTtlSeconds: positiveInt(env, 'MEDIA_CACHE_TTL_SECONDS', 86400),

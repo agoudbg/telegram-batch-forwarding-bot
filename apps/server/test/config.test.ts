@@ -17,6 +17,7 @@ describe('loadServerConfig', () => {
       internalMediaHost: '127.0.0.1',
       internalMediaSecret: 'internal-secret',
       mediaWebMaxBytes: 20 * 1024 * 1024,
+      mediaCacheEnabled: true,
       mediaCacheMaxBytes: 5 * 1024 * 1024 * 1024,
       mediaCacheLowWatermarkBytes: 4 * 1024 * 1024 * 1024,
       mediaCacheTtlSeconds: 86400,
@@ -73,6 +74,18 @@ describe('loadServerConfig', () => {
   it('accepts a custom web media limit', () => {
     expect(loadServerConfig({ ...BASE_ENV, MEDIA_WEB_MAX_BYTES: '1048576' }).mediaWebMaxBytes).toBe(
       1048576,
+    );
+  });
+
+  it('allows the local media cache to be disabled explicitly', () => {
+    expect(loadServerConfig({ ...BASE_ENV, MEDIA_CACHE_ENABLED: 'false' }).mediaCacheEnabled).toBe(
+      false,
+    );
+  });
+
+  it('rejects an invalid media cache flag', () => {
+    expect(() => loadServerConfig({ ...BASE_ENV, MEDIA_CACHE_ENABLED: 'sometimes' })).toThrow(
+      'MEDIA_CACHE_ENABLED',
     );
   });
 

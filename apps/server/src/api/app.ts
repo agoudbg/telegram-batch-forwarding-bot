@@ -15,7 +15,7 @@ import type { TLJsonValue } from '@tbfb/tlbridge';
 
 import type { StorageDatabase } from '../storage/database.js';
 import { listMediaSources, listMessages, listPeers, listShareMedia } from '../storage/repository.js';
-import type { MediaCache } from '../mediaCache.js';
+import type { MediaCache, MediaOriginClient } from '../mediaCache.js';
 import type { MediaRequestGovernor } from '../mediaGovernor.js';
 import type { PeerKind } from '../storage/repository.js';
 import { checkShareAccess } from './gate.js';
@@ -65,7 +65,7 @@ export interface ShareMediaEntry {
   /** An unhosted file can be re-sent by the bot via its InputDocument
    *  reference (the `get_<shareId>_<seq>` deep link, §2.5) */
   retrievable: boolean;
-  /** `/media/:shareId/:fakeKey`; null unless the file is hosted on disk */
+  /** `/media/:shareId/:fakeKey`; null when no hosted or refreshable source exists */
   url: string | null;
   /** Thumbnail URL (`?thumb=1`); null when no thumbnail was extracted */
   thumbUrl: string | null;
@@ -81,8 +81,12 @@ export interface ServerAppDeps {
   /** Public origin used for canonical and social preview URLs. */
   publicOrigin?: string;
   mediaCache?: MediaCache;
+  /** Direct origin used when the local media cache is disabled. */
+  mediaOrigin?: MediaOriginClient;
   /** Maximum full-media size exposed through the share web path. */
   maxHostedMediaBytes?: number;
+  /** Abort a direct origin stream that does not make progress in time. */
+  mediaDownloadTimeoutMs?: number;
   mediaGovernor?: MediaRequestGovernor;
   trustedProxyIps?: readonly string[];
   /** Absolute path to the built share frontend. */

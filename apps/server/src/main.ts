@@ -32,23 +32,26 @@ function main(): void {
   loadEnvFile();
   const config = loadServerConfig();
   const db = openDatabase(path.join(config.dataDir, 'tbfb.db'));
-  const mediaCache = new MediaCache({
-    db,
-    dataDir: config.dataDir,
-    origin: new HttpMediaOriginClient(
-      config.internalMediaPort,
-      config.internalMediaSecret,
-      config.internalMediaHost,
-    ),
-    maxBytes: config.mediaCacheMaxBytes,
-    maxMediaBytes: config.mediaWebMaxBytes,
-    lowWatermarkBytes: config.mediaCacheLowWatermarkBytes,
-    ttlSeconds: config.mediaCacheTtlSeconds,
-    sweepIntervalSeconds: config.mediaCacheSweepIntervalSeconds,
-    maxConcurrentFetches: config.mediaFetchConcurrency,
-    downloadTimeoutMs: config.mediaDownloadTimeoutMs,
-    log: (line) => console.error(`[media-cache] ${line}`),
-  });
+  const mediaOrigin = new HttpMediaOriginClient(
+    config.internalMediaPort,
+    config.internalMediaSecret,
+    config.internalMediaHost,
+  );
+  const mediaCache = config.mediaCacheEnabled
+    ? new MediaCache({
+        db,
+        dataDir: config.dataDir,
+        origin: mediaOrigin,
+        maxBytes: config.mediaCacheMaxBytes,
+        maxMediaBytes: config.mediaWebMaxBytes,
+        lowWatermarkBytes: config.mediaCacheLowWatermarkBytes,
+        ttlSeconds: config.mediaCacheTtlSeconds,
+        sweepIntervalSeconds: config.mediaCacheSweepIntervalSeconds,
+        maxConcurrentFetches: config.mediaFetchConcurrency,
+        downloadTimeoutMs: config.mediaDownloadTimeoutMs,
+        log: (line) => console.error(`[media-cache] ${line}`),
+      })
+    : undefined;
   const mediaGovernor = new MediaRequestGovernor({
     requestsPerMinute: config.mediaRequestsPerMinute,
     requestBurst: config.mediaRequestBurst,
@@ -69,7 +72,9 @@ function main(): void {
     botUsername: config.botUsername,
     publicOrigin: config.publicOrigin,
     mediaCache,
+    mediaOrigin,
     maxHostedMediaBytes: config.mediaWebMaxBytes,
+    mediaDownloadTimeoutMs: config.mediaDownloadTimeoutMs,
     mediaGovernor,
     trustedProxyIps: config.trustedProxyIps,
     webRoot: existsSync(webIndexPath) ? webRoot : undefined,

@@ -50,6 +50,11 @@ for existing shares. `INTERNAL_MEDIA_SECRET` must be the same for the server
 and bot services. Generate both secrets independently with a local secret
 generator such as `openssl rand -hex 32`.
 
+Set `MEDIA_CACHE_ENABLED=false` when the host should stream media directly
+from the private Telegram origin without retaining a local media cache. The
+public media endpoint remains responsible for share access checks and rate
+limits; each request will fetch the media again.
+
 The container defaults to UID/GID `1000:1000`. On Linux or WSL, make the data
 directory writable by that identity when necessary:
 

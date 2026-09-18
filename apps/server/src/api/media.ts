@@ -17,8 +17,9 @@ import type { Context, Hono } from 'hono';
 
 import type { StorageDatabase } from '../storage/database.js';
 import { MediaFetchError } from '../mediaCache.js';
-import type { MediaCache } from '../mediaCache.js';
+import type { MediaCache, MediaOriginClient } from '../mediaCache.js';
 import type { MediaRequestGovernor } from '../mediaGovernor.js';
+import type { MediaCacheVariant, MediaRow } from '../storage/repository.js';
 import { checkShareAccess } from './gate.js';
 import { createShareSanitizer, resolveMediaKey } from './sanitize.js';
 
@@ -28,8 +29,12 @@ export interface MediaRouteDeps {
   /** Base directory holding media/ (media rows store paths relative to it) */
   dataDir: string;
   mediaCache?: MediaCache;
+  /** Direct origin used when the local media cache is disabled. */
+  mediaOrigin?: MediaOriginClient;
   /** Maximum full-media size exposed through the share web path. */
   maxHostedMediaBytes?: number;
+  /** Abort a direct origin stream that does not make progress in time. */
+  mediaDownloadTimeoutMs?: number;
   mediaGovernor?: MediaRequestGovernor;
   trustedProxyIps?: readonly string[];
 }
@@ -97,9 +102,9 @@ export function registerMediaRoutes(app: Hono, deps: MediaRouteDeps): void {
       return c.json({ error: 'not_found' }, 404);
     }
 
+    const variant = media.key.startsWith('avatar_') ? 'avatar' : thumb ? 'thumb' : 'full';
     if (relPath === null && deps.mediaCache !== undefined) {
       try {
-        const variant = media.key.startsWith('avatar_') ? 'avatar' : thumb ? 'thumb' : 'full';
         const cached = await deps.mediaCache.open(media, variant, c.req.raw.signal);
         return streamHandle(
           c,
@@ -121,6 +126,19 @@ export function registerMediaRoutes(app: Hono, deps: MediaRouteDeps): void {
         }
         return c.json({ error: 'media_unavailable' }, 503, { 'Retry-After': '5' });
       }
+    }
+    if (relPath === null && deps.mediaOrigin !== undefined) {
+      return streamOrigin(
+        c,
+        deps.mediaOrigin,
+        media,
+        variant,
+        c.req.header('range'),
+        deps.mediaDownloadTimeoutMs,
+        deps.mediaGovernor,
+        shareId,
+        clientId,
+      );
     }
     if (relPath === null) return c.json({ error: 'not_found' }, 404);
 
@@ -178,6 +196,153 @@ export function registerMediaRoutes(app: Hono, deps: MediaRouteDeps): void {
     );
     return c.body(stream, status, headers);
   });
+}
+
+async function streamOrigin(
+  c: Context,
+  origin: MediaOriginClient,
+  media: MediaRow,
+  variant: MediaCacheVariant,
+  rangeHeader: string | undefined,
+  downloadTimeoutMs: number | undefined,
+  governor: MediaRequestGovernor | undefined,
+  shareId: string,
+  clientId: string,
+): Promise<Response> {
+  const originSignal =
+    downloadTimeoutMs === undefined
+      ? c.req.raw.signal
+      : AbortSignal.any([c.req.raw.signal, AbortSignal.timeout(downloadTimeoutMs)]);
+  let response: Response;
+  try {
+    response = await origin.fetch(media.key, variant, originSignal);
+  } catch (error) {
+    return mediaErrorResponse(c, error);
+  }
+
+  if (!response.ok || response.body === null) {
+    await cancelResponseBody(response);
+    return mediaErrorResponse(
+      c,
+      new MediaFetchError(
+        response.ok ? 503 : response.status,
+        response.headers.get('Retry-After') ?? undefined,
+      ),
+    );
+  }
+
+  const originSize = parseContentLength(response.headers.get('Content-Length'));
+  const size = variant === 'full' ? (media.size ?? originSize) : originSize;
+  const headers: Record<string, string> = {
+    'Content-Type':
+      response.headers.get('Content-Type') ?? media.mime ?? 'application/octet-stream',
+    'Accept-Ranges': 'bytes',
+    'Cache-Control': 'no-store',
+  };
+
+  if (size === 0) {
+    await cancelResponseBody(response);
+    headers['Content-Length'] = '0';
+    return c.body(null, 200, headers);
+  }
+
+  const range = size === null ? null : parseRangeHeader(rangeHeader, size);
+  if (range === 'invalid') {
+    await cancelResponseBody(response);
+    return c.body(null, 416, {
+      ...headers,
+      'Content-Range': `bytes */${size ?? 0}`,
+    });
+  }
+
+  const start = range === null ? 0 : range.start;
+  const end = range === null ? undefined : range.end;
+  if (range !== null) {
+    headers['Content-Length'] = String(range.end - range.start + 1);
+    headers['Content-Range'] = `bytes ${range.start}-${range.end}/${size}`;
+  } else if (size !== null) {
+    headers['Content-Length'] = String(size);
+  }
+
+  const stream = toWebStream(
+    createOriginStream(response.body, start, end, originSignal),
+    governor,
+    shareId,
+    clientId,
+    c.req.raw.signal,
+  );
+  return c.body(stream, range === null ? 200 : 206, headers);
+}
+
+function mediaErrorResponse(c: Context, error: unknown): Response {
+  if (error instanceof MediaFetchError) {
+    const headers =
+      error.retryAfter === undefined ? undefined : { 'Retry-After': error.retryAfter };
+    return c.json(
+      { error: error.status === 404 ? 'not_found' : 'media_unavailable' },
+      error.status === 404 ? 404 : 503,
+      headers,
+    );
+  }
+  return c.json({ error: 'media_unavailable' }, 503, { 'Retry-After': '5' });
+}
+
+function parseContentLength(value: string | null): number | null {
+  if (value === null) return null;
+  const size = Number(value);
+  return Number.isSafeInteger(size) && size >= 0 ? size : null;
+}
+
+async function cancelResponseBody(response: Response): Promise<void> {
+  if (response.body !== null) await response.body.cancel().catch(() => undefined);
+}
+
+function createOriginStream(
+  body: ReadableStream<Uint8Array>,
+  start: number,
+  end: number | undefined,
+  signal: AbortSignal,
+): Readable {
+  return Readable.from(
+    (async function* () {
+      const reader = body.getReader();
+      let position = 0;
+      let completed = false;
+      const cancel = () => {
+        void reader.cancel(signal.reason).catch(() => undefined);
+      };
+      signal.addEventListener('abort', cancel, { once: true });
+      try {
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) {
+            completed = true;
+            return;
+          }
+
+          const chunk = Buffer.from(value);
+          const chunkStart = position;
+          position += chunk.length;
+          const chunkEnd = position - 1;
+          if (chunkEnd < start) continue;
+
+          const from = Math.max(0, start - chunkStart);
+          const to =
+            end === undefined ? chunk.length : Math.min(chunk.length, end - chunkStart + 1);
+          if (to > from) yield chunk.subarray(from, to);
+          if (end !== undefined && chunkEnd >= end) {
+            completed = true;
+            await reader.cancel();
+            return;
+          }
+        }
+      } finally {
+        signal.removeEventListener('abort', cancel);
+        if (!completed) await reader.cancel().catch(() => undefined);
+      }
+    })(),
+    { signal },
+  );
 }
 
 export function isMediaWithinHostingLimit(

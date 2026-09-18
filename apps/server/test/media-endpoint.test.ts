@@ -198,6 +198,62 @@ describe('GET /media/:shareId/:key', () => {
     expect(fetches).toBe(1);
   });
 
+  it('streams a Telegram source without writing or reusing a local cache', async () => {
+    const dataDir = await mkdtemp(path.join(tmpdir(), 'tbfb-server-stream-'));
+    dirs.push(dataDir);
+    const db = openDatabase(':memory:');
+    createShare(db, { id: SHARE_ID, ownerUserId: 'u1' });
+    insertMediaIfAbsent(db, {
+      key: 'stream-only',
+      hosted: true,
+      path: null,
+      mime: 'text/plain',
+      size: CONTENT.length,
+    });
+    upsertMediaSource(db, {
+      mediaKey: 'stream-only',
+      kind: 'document',
+      sourcePeerId: 'u1',
+      sourceMessageId: 9,
+      reference: '{}',
+    });
+    linkMediaToShare(db, SHARE_ID, 'stream-only');
+    finalizeShare(db, SHARE_ID);
+
+    let fetches = 0;
+    const app = createServerApp({
+      db,
+      sanitizeSecret: SECRET,
+      dataDir,
+      mediaOrigin: {
+        fetch: () => {
+          fetches += 1;
+          return Promise.resolve(
+            new Response(CONTENT, {
+              headers: { 'Content-Type': 'text/plain', 'Content-Length': String(CONTENT.length) },
+            }),
+          );
+        },
+      },
+    });
+    const fakeKey = sanitizeMediaKey(createShareSanitizer(SECRET, SHARE_ID), 'stream-only');
+    const url = `/media/${SHARE_ID}/${fakeKey}`;
+
+    const range = await app.request(url, { headers: { Range: 'bytes=6-' } });
+    expect(range.status).toBe(206);
+    expect(range.headers.get('Cache-Control')).toBe('no-store');
+    expect(range.headers.get('Content-Range')).toBe(`bytes 6-10/${CONTENT.length}`);
+    expect(await range.text()).toBe('world');
+
+    const full = await app.request(url);
+    expect(full.status).toBe(200);
+    expect(await full.text()).toBe(CONTENT);
+    expect(fetches).toBe(2);
+    expect(db.prepare('SELECT COUNT(*) AS count FROM media_cache').get()).toMatchObject({
+      count: 0,
+    });
+  });
+
   it('answers 416 for unsatisfiable ranges', async () => {
     const { app, url } = await setup();
     const res = await app.request(url, { headers: { Range: 'bytes=50-60' } });

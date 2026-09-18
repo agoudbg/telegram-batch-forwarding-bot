@@ -134,6 +134,11 @@ the file reference, and streams the file to the HTTP server. Bots may use
 - Telegram downloads time out and are cancelled when their last viewer disconnects.
 - Public media requests and bandwidth use independent per-share and per-client token buckets.
 - Full media, thumbnails, and resolvable origin avatars use the same cache.
+- `MEDIA_CACHE_ENABLED` defaults to `true`. When disabled, the public media
+  endpoint keeps its share gate, rate limits and Range behavior but streams
+  directly from the private Telegram origin without reading or writing the
+  local media cache. These requests use `Cache-Control: no-store` and do not
+  share an in-flight download with later requests.
 - The existing `get_<shareId>_<seq>` deep link remains a last-resort document
   delivery path when the web download cannot be recovered.
 
