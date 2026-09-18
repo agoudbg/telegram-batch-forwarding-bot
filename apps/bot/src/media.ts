@@ -15,7 +15,7 @@ import type { TLJsonObject, TLJsonValue } from '@tbfb/tlbridge';
 import { collectReferencedPeers, isTLJsonLong } from '@tbfb/tlbridge';
 
 import type { Batch } from './batching.js';
-import type { BotPorts, InputDocumentRef, InputPhotoRef } from './ports.js';
+import type { BotPorts, InputDocumentRef, InputPhotoRef, PeerKind } from './ports.js';
 
 export interface MediaInfo {
   kind: 'photo' | 'document';
@@ -254,21 +254,23 @@ export class MediaPipeline {
   }
 
   private async processAvatars(batch: Batch): Promise<number> {
-    const seen = new Map<string, 'user' | 'chat' | 'channel'>();
+    const seen = new Map<string, { peerId: string; kind: PeerKind }>();
     for (const item of batch.items) {
       collectReferencedPeers(item.message.tlJson).forEach(({ peerId, kind }) => {
-        if (!seen.has(peerId)) seen.set(peerId, kind);
+        const identity = `${kind}:${peerId}`;
+        if (!seen.has(identity)) seen.set(identity, { peerId, kind });
       });
     }
 
     let count = 0;
-    for (const [peerId, kind] of seen) {
+    for (const { peerId, kind } of seen.values()) {
       try {
-        const resolved = await this.deps.host.resolvePeer(peerId);
+        const resolved = await this.deps.host.resolvePeer(peerId, kind);
         if (resolved === null) continue; // unresolvable → frontend letter fallback
 
+        const resolvedKind = resolved.kind ?? kind;
         let avatarKey: string | null = null;
-        const key = `avatar_${peerId}`;
+        const key = `avatar_${resolvedKind}_${peerId}`;
         if (resolved.hasAvatar) {
           insertMediaIfAbsent(this.deps.db, {
             key,
@@ -282,7 +284,7 @@ export class MediaPipeline {
             kind: 'avatar',
             sourcePeerId: peerId,
             sourceMessageId: 0,
-            reference: JSON.stringify({ peerId }),
+            reference: JSON.stringify({ peerId, kind: resolvedKind }),
           });
           avatarKey = key;
         }
@@ -290,7 +292,7 @@ export class MediaPipeline {
         upsertPeer(this.deps.db, {
           shareId: batch.id,
           peerId,
-          kind: resolved.kind ?? kind,
+          kind: resolvedKind,
           displayName: resolved.displayName,
           username: resolved.username ?? null,
           avatarKey,

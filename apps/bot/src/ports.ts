@@ -44,8 +44,10 @@ export interface InputPhotoRef {
   fileReference: string;
 }
 
+export type PeerKind = 'user' | 'chat' | 'channel';
+
 export interface ResolvedPeer {
-  kind: 'user' | 'chat' | 'channel';
+  kind: PeerKind;
   displayName: string;
   username?: string;
   hasAvatar: boolean;
@@ -61,5 +63,5 @@ export interface BotPorts {
    *  processing status are removed once a share is ready) */
   deleteMessages(chatId: string, messageIds: number[]): Promise<void>;
   /** null = unresolvable (e.g. a channel the bot is not in) */
-  resolvePeer(peerId: string): Promise<ResolvedPeer | null>;
+  resolvePeer(peerId: string, kind: PeerKind): Promise<ResolvedPeer | null>;
 }

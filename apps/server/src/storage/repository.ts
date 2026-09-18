@@ -385,6 +385,7 @@ export function upsertPeer(
   db: StorageDatabase,
   peer: { shareId: string; peerId: string; kind: PeerKind } & Partial<PeerRow>,
 ): void {
+  const storagePeerId = `${peer.kind}:${peer.peerId}`;
   db.prepare(
     `INSERT INTO peers (share_id, peer_id, kind, display_name, username, avatar_key)
      VALUES (?, ?, ?, ?, ?, ?)
@@ -394,7 +395,7 @@ export function upsertPeer(
        avatar_key = COALESCE(excluded.avatar_key, peers.avatar_key)`,
   ).run(
     peer.shareId,
-    peer.peerId,
+    storagePeerId,
     peer.kind,
     peer.displayName ?? null,
     peer.username ?? null,
@@ -406,11 +407,16 @@ export function listPeers(db: StorageDatabase, shareId: string): PeerRow[] {
   const rows = db.prepare(`SELECT * FROM peers WHERE share_id = ?`).all(shareId) as any[];
   return rows.map((row) => ({
     shareId: row.share_id,
-    peerId: row.peer_id,
+    peerId: peerIdFromStorageKey(row.peer_id),
     kind: row.kind,
     displayName: row.display_name,
     username: row.username,
     avatarKey: row.avatar_key,
   }));
+}
+
+function peerIdFromStorageKey(storagePeerId: string): string {
+  const match = /^(user|chat|channel):(.+)$/.exec(storagePeerId);
+  return match === null ? storagePeerId : match[2]!;
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */

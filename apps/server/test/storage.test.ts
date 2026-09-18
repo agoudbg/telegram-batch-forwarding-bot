@@ -258,4 +258,16 @@ describe('peers', () => {
       avatarKey: 'avatar_777',
     });
   });
+
+  it('keeps peer kinds separate when numeric ids overlap', () => {
+    const db = freshDb();
+    createShare(db, { id: 's1', ownerUserId: '42' });
+    upsertPeer(db, { shareId: 's1', peerId: '777', kind: 'user', displayName: 'User' });
+    upsertPeer(db, { shareId: 's1', peerId: '777', kind: 'channel', displayName: 'Channel' });
+
+    expect(listPeers(db, 's1').map((peer) => [peer.kind, peer.displayName]).sort()).toEqual([
+      ['channel', 'Channel'],
+      ['user', 'User'],
+    ]);
+  });
 });

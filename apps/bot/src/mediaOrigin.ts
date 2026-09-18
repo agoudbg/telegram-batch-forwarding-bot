@@ -6,6 +6,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { createServer } from 'node:http';
 import type { Server, ServerResponse } from 'node:http';
 
+import bigInt from 'big-integer';
 import { Api, TelegramClient } from 'teleproto';
 
 import type { MediaCacheVariant, MediaSourceRow, StorageDatabase } from '@tbfb/server';
@@ -83,7 +84,7 @@ async function handleRequest(
       response.writeHead(404).end();
       return;
     }
-    const entity = await options.client.getEntity(source.sourcePeerId);
+    const entity = await options.client.getEntity(avatarPeerInput(source));
     if (Array.isArray(entity)) {
       response.writeHead(404).end();
       return;
@@ -133,6 +134,36 @@ async function handleRequest(
     outputFile: response,
   });
   if (!response.writableEnded) response.end();
+}
+
+function avatarPeerInput(source: MediaSourceRow) {
+  const reference = parseAvatarReference(source.reference);
+  if (reference === null) return source.sourcePeerId;
+
+  const id = bigInt(reference.peerId);
+  if (reference.kind === 'user') return new Api.PeerUser({ userId: id });
+  if (reference.kind === 'chat') return new Api.PeerChat({ chatId: id });
+  return new Api.PeerChannel({ channelId: id });
+}
+
+function parseAvatarReference(
+  json: string | null,
+): { peerId: string; kind: 'user' | 'chat' | 'channel' } | null {
+  if (json === null) return null;
+  try {
+    const value: unknown = JSON.parse(json);
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+    const candidate = value as Record<string, unknown>;
+    if (
+      typeof candidate.peerId !== 'string'
+      || (candidate.kind !== 'user' && candidate.kind !== 'chat' && candidate.kind !== 'channel')
+    ) {
+      return null;
+    }
+    return { peerId: candidate.peerId, kind: candidate.kind };
+  } catch {
+    return null;
+  }
 }
 
 async function findSourceMessage(

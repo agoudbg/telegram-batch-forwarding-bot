@@ -17,7 +17,9 @@ import { loadConfig } from './config.js';
 import { registerBotCommands } from './commands.js';
 import { createBotLogger } from './logging.js';
 import { startMediaOrigin } from './mediaOrigin.js';
-import type { BotPorts, InputDocumentRef, NormalizedMessage, ResolvedPeer } from './ports.js';
+import type {
+  BotPorts, InputDocumentRef, NormalizedMessage, PeerKind, ResolvedPeer,
+} from './ports.js';
 import { loadSessionValue, persistSessionValue } from './session.js';
 
 /** Load the first .env found walking up from the cwd (no dependency;
@@ -175,10 +177,10 @@ function createTeleprotoPorts(client: TelegramClient): BotPorts {
       });
     },
 
-    async resolvePeer(peerId) {
+    async resolvePeer(peerId, kind) {
       let entity: unknown;
       try {
-        entity = await client.getEntity(bigInt(peerId));
+        entity = await client.getEntity(peerInput(peerId, kind));
       } catch {
         return null; // unresolvable (e.g. a channel the bot is not in)
       }
@@ -186,6 +188,13 @@ function createTeleprotoPorts(client: TelegramClient): BotPorts {
       return resolvedPeerFromEntity(entity);
     },
   };
+}
+
+function peerInput(peerId: string, kind: PeerKind) {
+  const id = bigInt(peerId);
+  if (kind === 'user') return new Api.PeerUser({ userId: id });
+  if (kind === 'chat') return new Api.PeerChat({ chatId: id });
+  return new Api.PeerChannel({ channelId: id });
 }
 
 function resolvedPeerFromEntity(entity: unknown): ResolvedPeer | null {

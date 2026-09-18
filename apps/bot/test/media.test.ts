@@ -6,7 +6,7 @@ import type { TLJsonObject } from '@tbfb/tlbridge';
 
 import type { Batch } from '../src/batching.js';
 import { MediaPipeline, extractMediaInfo, withRetry } from '../src/media.js';
-import type { BotPorts, ResolvedPeer } from '../src/ports.js';
+import type { BotPorts, PeerKind, ResolvedPeer } from '../src/ports.js';
 import { createShare, getMedia, listMediaSources, listPeers } from '@tbfb/server';
 
 function photoMessage(photoId: string): TLJsonObject {
@@ -147,13 +147,13 @@ describe('MediaPipeline', () => {
   async function setup() {
     const db = openDatabase(':memory:');
     const host: Pick<BotPorts, 'resolvePeer'> = {
-      resolvePeer: (peerId): Promise<ResolvedPeer | null> =>
+      resolvePeer: (peerId, kind: PeerKind): Promise<ResolvedPeer | null> =>
         Promise.resolve(
           peerId === 'unresolvable'
             ? null
             : {
-                kind: 'channel',
-                displayName: `Channel ${peerId}`,
+                kind,
+                displayName: `${kind} ${peerId}`,
                 hasAvatar: peerId !== 'noavatar',
               },
         ),
@@ -277,10 +277,33 @@ describe('MediaPipeline', () => {
     expect(peers).toHaveLength(1);
     expect(peers[0]).toMatchObject({
       peerId: '10',
-      displayName: 'Channel 10',
-      avatarKey: 'avatar_10',
+      displayName: 'channel 10',
+      avatarKey: 'avatar_channel_10',
     });
-    expect(getMedia(db, 'avatar_10')).toMatchObject({ hosted: true, mime: 'image/jpeg' });
+    expect(getMedia(db, 'avatar_channel_10')).toMatchObject({ hosted: true, mime: 'image/jpeg' });
+  });
+
+  it('keeps peers with the same id but different kinds separate', async () => {
+    const { db, pipeline } = await setup();
+    const forward = (className: 'PeerUser' | 'PeerChannel'): TLJsonObject => ({
+      className: 'Message',
+      fwdFrom: {
+        className: 'MessageFwdHeader',
+        date: 100,
+        fromId: className === 'PeerUser'
+          ? { className, userId: { $long: '10' } }
+          : { className, channelId: { $long: '10' } },
+      },
+    });
+    const result = await pipeline.processBatch(batch([
+      { tlJson: forward('PeerUser') },
+      { tlJson: forward('PeerChannel') },
+    ]));
+
+    expect(result.avatars).toBe(2);
+    expect(listPeers(db, 'share1').map((peer) => peer.kind).sort()).toEqual(['channel', 'user']);
+    expect(getMedia(db, 'avatar_user_10')).not.toBeNull();
+    expect(getMedia(db, 'avatar_channel_10')).not.toBeNull();
   });
 
   it('resolves all peers referenced by special-message payloads', async () => {
