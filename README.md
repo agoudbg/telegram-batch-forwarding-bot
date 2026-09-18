@@ -60,19 +60,23 @@ The host's existing reverse proxy remains responsible for public HTTPS. Set
 `PUBLIC_ORIGIN` to the final address used to open the share page, configure the
 same address in BotFather, and rebuild after changing it.
 
+On Linux or WSL, the root `Makefile` provides the common setup, verification
+and Compose operations below. Run `make help` to see all targets. The raw
+commands remain valid when GNU Make is not available.
+
 ```bash
 cp .env.example .env
 # Edit .env and set API_ID, API_HASH, BOT_TOKEN, PUBLIC_ORIGIN,
 # SANITIZE_SECRET, BOT_USERNAME and INTERNAL_MEDIA_SECRET.
-mkdir -p data
-docker compose config
-docker compose up -d --build
-curl --fail http://127.0.0.1:3000/healthz
+make init data
+make docker-config
+make docker-up
+make health
 ```
 
 The bot and server use the same `INTERNAL_MEDIA_SECRET`. The Compose file
 connects the server to the bot's private `3001` media-origin port without
-publishing that port. `docker compose down` removes containers but keeps
+publishing that port. `make docker-down` removes containers but keeps
 `./data`; back up that directory before upgrades or host maintenance.
 
 The source deployment remains available when Docker is not desired. See
@@ -87,29 +91,39 @@ independent media limits.
 
 The backend requires Node.js 22 or newer and pnpm 10. The WebA submodule has
 its own toolchain and currently requires Node.js `^24.11` with npm `^11`.
+The commands below use GNU Make on Linux or WSL; use the equivalent `pnpm` and
+`npm` commands shown in this document when Make is unavailable.
+
+Common Git inspection and synchronization shortcuts are also available:
 
 ```bash
-git submodule update --init apps/web
-cp .env.example .env
-pnpm install
+make git-status
+make git-diff
+make git-log
+make git-update
+```
 
-cd apps/web
-npm ci --install-strategy=nested
-cd ../..
+`git-update` refuses to run with local changes, then performs
+`git pull --ff-only` and recursively updates the checked-out submodules.
+Staging and committing remain explicit Git operations so unrelated work is not
+included accidentally.
+
+```bash
+cp .env.example .env
+make setup
 ```
 
 Build and start the API, bot and built share frontend together:
 
 ```bash
-pnpm build:deploy
-pnpm start
+make source-build
+make source-start
 ```
 
 Start the mocked WebA share view in a third terminal:
 
 ```bash
-cd apps/web
-npm run dev:mocked
+make web-dev-mocked
 ```
 
 The share route is `http://localhost:1235/s/<shareId>` and Vite proxies its
@@ -149,26 +163,20 @@ bot.
 Backend and bridge gates:
 
 ```bash
-pnpm build
-pnpm typecheck
-pnpm test
-pnpm lint
+make verify
 ```
 
 WebA gates:
 
 ```bash
-cd apps/web
-npm run check:ts
-npm test
-npm run build:share
-npm run test:playwright
+make web-verify
 ```
 
-The Playwright matrix covers desktop and mobile rendering for all supported
-fixture types and the screenshot baselines. Run it after every telegram-tt
-sync. See [docs/UPSTREAM.md](docs/UPSTREAM.md) for the complete upgrade
-procedure.
+After a telegram-tt sync, run `make web-localization` when the legacy
+localization needs regeneration, then run `make web-verify`. The Playwright
+matrix covers desktop and mobile rendering for all supported fixture types and
+the screenshot baselines. See [docs/UPSTREAM.md](docs/UPSTREAM.md) for the
+complete upgrade procedure.
 
 ## Privacy and Security
 

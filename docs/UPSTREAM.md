@@ -4,6 +4,10 @@ This project tracks two independent upstream lines. Keep their upgrades
 separate so a rendering regression can be attributed to telegram-tt and a TL
 schema regression can be attributed to teleproto.
 
+The commands below use the root `Makefile` from the repository root. Run
+`make help` for the available shortcuts, or use the equivalent raw commands
+when GNU Make is unavailable.
+
 ## telegram-tt Fork
 
 `apps/web` is a submodule pointing to `agoudbg/telegram-tt` on the
@@ -14,7 +18,7 @@ The branch consists of small project commits stacked on upstream `master`.
 Do not merge upstream into `share-view`; periodically rebase the stack:
 
 ```bash
-git submodule update --init apps/web
+make init
 cd apps/web
 git status --short
 git fetch upstream --prune
@@ -58,15 +62,13 @@ Generated `dist/` output is ignored and must not be committed.
 
 ### Regression Gate
 
-After resolving the rebase, rebuild and run the full compatibility matrix:
+From the repository root, after resolving the rebase, rebuild and run the full
+compatibility matrix:
 
 ```bash
-npm ci
-npm run lang:share-legacy
-npm run check:ts
-npm test
-npm run build:share
-npm run test:playwright
+make web-deps
+make web-localization
+make web-verify
 ```
 
 Inspect both desktop and mobile screenshot diffs. Update baselines only when
@@ -95,8 +97,7 @@ git add apps/web
 git commit -m "chore(web): sync telegram-tt upstream"
 ```
 
-Run the root `pnpm build`, `pnpm test` and `pnpm lint` gates before merging
-the gitlink update.
+Run `make verify` from the repository root before merging the gitlink update.
 
 ## teleproto
 
@@ -113,10 +114,7 @@ Routine upgrade:
 ```bash
 pnpm --filter @tbfb/bot outdated teleproto
 pnpm --filter @tbfb/bot update teleproto@~1.<layer>.<patch>
-pnpm build
-pnpm typecheck
-pnpm test
-pnpm lint
+make verify
 ```
 
 Review the package and lockfile diff. Then run a real test-environment bot

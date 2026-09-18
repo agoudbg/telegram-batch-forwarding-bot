@@ -14,6 +14,10 @@ directory.
 - A public HTTPS hostname when deploying outside local development
 - Telegram credentials described in the root `README.md`
 
+GNU Make is optional. When available, the root `Makefile` provides the
+shortcuts used below; run `make help` for the complete list. The equivalent
+raw Docker and Git commands remain valid without Make.
+
 The current Windows development host is not the Docker validation target. Use
 native Linux or WSL for image builds and runtime checks.
 
@@ -25,7 +29,7 @@ Clone the repository with its WebA submodule:
 git clone --recurse-submodules https://github.com/agoudbg/telegram-batch-forwarding-bot.git telegram-batch-forwarding-bot
 cd telegram-batch-forwarding-bot
 cp .env.example .env
-mkdir -p data
+make init data
 ```
 
 Set at least these values in `.env`:
@@ -58,10 +62,10 @@ sudo chown -R 1000:1000 data
 Run these commands from the repository root:
 
 ```bash
-docker compose config
-docker compose up -d --build
-docker compose ps
-curl --fail http://127.0.0.1:3000/healthz
+make docker-config
+make docker-up
+make docker-ps
+make health
 ```
 
 The server serves the WebA share frontend, API and media from port `3000`.
@@ -83,7 +87,7 @@ For the Linux Docker bridge deployment above, host connections normally appear
 as the bridge gateway. Inspect its address after starting the containers:
 
 ```bash
-docker inspect --format '{{range .NetworkSettings.Networks}}{{.Gateway}}{{end}}' "$(docker compose ps -q server)"
+make docker-gateway
 ```
 
 For example, if that returns `172.18.0.1`, set
@@ -105,8 +109,8 @@ Do not append with `$proxy_add_x_forwarded_for`. Comma-separated chains,
 invalid addresses and headers from untrusted peers fall back to the socket
 address. If a CDN or another proxy sits in front of the edge, configure that
 edge's trusted upstream IP handling first so it emits a validated visitor IP.
-Apply `.env` changes with `docker compose up -d --force-recreate server`
-(restart `pnpm start` in source mode).
+Apply `.env` changes with `make docker-recreate SERVICE=server`
+(restart `make source-start` in source mode).
 
 Verify that two visitors opening different shares have separate client limits,
 and that changing forwarding headers on a direct, untrusted connection cannot
@@ -115,28 +119,28 @@ bypass throttling. Per-share limits still apply across all visitors.
 ### Operations
 
 ```bash
-docker compose logs -f server bot
-docker compose restart server bot
-docker compose down
+make docker-logs
+make docker-restart
+make docker-down
 ```
 
-`docker compose down` removes containers and the default network, but it does
-not remove the `./data` bind mount. Do not use `docker compose down -v` as a
-backup strategy; SQLite, the Telegram session and the media cache all live in
-the host directory and should be backed up independently.
+`make docker-down` removes containers and the default network, but it does not
+remove the `./data` bind mount. The target deliberately does not provide a
+volume-removing variant; SQLite, the Telegram session and the media cache all
+live in the host directory and should be backed up independently.
 
 When updating source:
 
 ```bash
 git pull --ff-only
-git submodule update --init --recursive
-docker compose up -d --build
-curl --fail http://127.0.0.1:3000/healthz
+make init
+make docker-up
+make health
 ```
 
 Changing `PUBLIC_ORIGIN` or any frontend build configuration requires the
 `--build` command. Changing runtime secrets only requires container
-recreation, for example `docker compose up -d --force-recreate`.
+recreation, for example `make docker-recreate`.
 
 ### Troubleshooting
 
@@ -146,7 +150,7 @@ recreation, for example `docker compose up -d --force-recreate`.
   `./data` or set `TBFB_UID` and `TBFB_GID` to the host directory owner.
 - If the server is healthy but media requests fail, verify that
   `INTERNAL_MEDIA_SECRET` is non-empty and identical for both services.
-- If the bot exits during startup, inspect `docker compose logs bot`; Telegram
+- If the bot exits during startup, inspect `make docker-logs SERVICE=bot`; Telegram
   credentials and the session belong to the bot service.
 
 ## Source deployment
@@ -156,10 +160,9 @@ one local process tree managed by `deploy/start-app.mjs`:
 
 ```bash
 cp .env.example .env
-pnpm install
-npm --prefix apps/web ci --install-strategy=nested
-pnpm build:deploy
-pnpm start
+make setup
+make source-build
+make source-start
 ```
 
 The source workflow uses `DATA_DIR=./data` and listens on `127.0.0.1:3000` by
