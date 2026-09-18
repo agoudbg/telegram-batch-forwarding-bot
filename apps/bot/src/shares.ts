@@ -8,6 +8,7 @@ const MAX_DEEP_LINK_PAYLOAD_LENGTH = 64;
 const SHARE_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
 const URL_PATTERN = /https?:\/\/[^\s<>"'`]+/gi;
 const TRAILING_LINK_PUNCTUATION = /[.,!?;:)\]}>'"]+$/;
+const MAX_RATE_LIMIT_KEYS = 10_000;
 
 /** Random unguessable share id (§2.8: share pages are public by default, so
  *  the id is the capability). 72 bits of entropy, URL-safe. */
@@ -109,9 +110,19 @@ export class RateLimiter {
   ) {}
 
   allow(key: string): boolean {
-    const previous = this.last.get(key);
     const current = this.now();
+    for (const [trackedKey, timestamp] of this.last) {
+      if (current - timestamp >= this.intervalMs) this.last.delete(trackedKey);
+    }
+
+    const previous = this.last.get(key);
     if (previous !== undefined && current - previous < this.intervalMs) return false;
+
+    if (!this.last.has(key) && this.last.size >= MAX_RATE_LIMIT_KEYS) {
+      const oldestKey = this.last.keys().next().value;
+      if (oldestKey !== undefined) this.last.delete(oldestKey);
+    }
+
     this.last.set(key, current);
     return true;
   }

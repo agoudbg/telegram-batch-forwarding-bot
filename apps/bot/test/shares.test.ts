@@ -112,6 +112,16 @@ describe('RateLimiter', () => {
     now += 3000;
     expect(limiter.allow('u1')).toBe(true);
   });
+
+  it('bounds tracked keys during a burst of new users', () => {
+    const limiter = new RateLimiter(3000, () => 1000);
+
+    for (let index = 0; index <= 10_000; index += 1) {
+      expect(limiter.allow(`u${index}`)).toBe(true);
+    }
+
+    expect(limiter.allow('u0')).toBe(true);
+  });
 });
 
 describe('SendQueue', () => {
