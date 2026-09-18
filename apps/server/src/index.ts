@@ -35,6 +35,7 @@ export {
   revokeShare,
   rewriteMessageSeqs,
   touchMediaCache,
+  updateMediaReference,
   upsertMediaCache,
   upsertMediaSource,
   upsertPeer,

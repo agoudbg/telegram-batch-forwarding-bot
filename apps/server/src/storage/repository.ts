@@ -229,6 +229,15 @@ export function getMedia(db: StorageDatabase, key: string): MediaRow | null {
   return row === undefined ? null : toMediaRow(row);
 }
 
+/** Store the newest reusable document reference for fallback delivery. */
+export function updateMediaReference(
+  db: StorageDatabase,
+  key: string,
+  reference: string,
+): void {
+  db.prepare(`UPDATE media SET reference = ? WHERE key = ?`).run(reference, key);
+}
+
 /** Record another message capable of refreshing a Telegram media reference. */
 export function upsertMediaSource(
   db: StorageDatabase,

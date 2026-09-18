@@ -5,7 +5,12 @@ import bigInt from 'big-integer';
 import { Api, TelegramClient } from 'teleproto';
 import { afterAll, describe, expect, it } from 'vitest';
 
-import { insertMediaIfAbsent, openDatabase, upsertMediaSource } from '@tbfb/server';
+import {
+  getMedia,
+  insertMediaIfAbsent,
+  openDatabase,
+  upsertMediaSource,
+} from '@tbfb/server';
 
 import { startMediaOrigin } from '../src/mediaOrigin.js';
 
@@ -85,6 +90,11 @@ describe('media origin', () => {
     expect(response.headers.get('Content-Length')).toBeNull();
     expect(await response.text()).toBe('hello');
     expect(requestedId).toBe(77);
+    expect(JSON.parse(getMedia(db, '123')!.reference!)).toMatchObject({
+      id: '123',
+      accessHash: '456',
+      fileReference: Buffer.from('reference').toString('base64'),
+    });
   });
 
   it('rejects unauthenticated requests before querying Telegram', async () => {

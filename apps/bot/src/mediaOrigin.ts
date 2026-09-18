@@ -9,7 +9,12 @@ import type { Server, ServerResponse } from 'node:http';
 import { Api, TelegramClient } from 'teleproto';
 
 import type { MediaCacheVariant, MediaSourceRow, StorageDatabase } from '@tbfb/server';
-import { getMedia, listMediaSources, upsertMediaSource } from '@tbfb/server';
+import {
+  getMedia,
+  listMediaSources,
+  updateMediaReference,
+  upsertMediaSource,
+} from '@tbfb/server';
 
 export interface MediaOriginOptions {
   db: StorageDatabase;
@@ -148,10 +153,14 @@ async function findSourceMessage(
     );
     if (message === undefined) continue;
     const reference = referenceFromMessage(message);
+    const serializedReference = reference === null ? source.reference : JSON.stringify(reference);
     upsertMediaSource(options.db, {
       ...source,
-      reference: reference === null ? source.reference : JSON.stringify(reference),
+      reference: serializedReference,
     });
+    if (source.kind === 'document' && reference !== null) {
+      updateMediaReference(options.db, mediaKey, JSON.stringify(reference));
+    }
     return { message, source };
   }
   return null;
