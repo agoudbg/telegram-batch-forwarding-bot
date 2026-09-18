@@ -17,14 +17,14 @@ export interface BotConfig {
   /** Bind address for the private media origin; defaults to loopback. */
   internalMediaHost: string;
   internalMediaSecret: string;
-  mediaCacheMaxBytes: number;
+  mediaWebMaxBytes: number;
   batchSilenceMs: number;
   /** Connect to the Telegram test DCs instead of production (TELEGRAM_TEST_SERVER) */
   testServer: boolean;
 }
 
 const DEFAULT_INTERNAL_MEDIA_PORT = 3001;
-const DEFAULT_CACHE_MAX_BYTES = 5 * 1024 * 1024 * 1024;
+const DEFAULT_WEB_MEDIA_MAX_BYTES = 20 * 1024 * 1024;
 const DEFAULT_BATCH_SILENCE_MS = 10000;
 
 function required(env: NodeJS.ProcessEnv, name: string): string {
@@ -73,10 +73,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): BotConfig {
     internalMediaPort: optionalInt(env, 'INTERNAL_MEDIA_PORT', DEFAULT_INTERNAL_MEDIA_PORT),
     internalMediaHost: env.INTERNAL_MEDIA_HOST || '127.0.0.1',
     internalMediaSecret: required(env, 'INTERNAL_MEDIA_SECRET'),
-    mediaCacheMaxBytes: optionalSafeInt(
+    mediaWebMaxBytes: optionalSafeInt(
       env,
-      'MEDIA_CACHE_MAX_BYTES',
-      DEFAULT_CACHE_MAX_BYTES,
+      'MEDIA_WEB_MAX_BYTES',
+      DEFAULT_WEB_MEDIA_MAX_BYTES,
     ),
     batchSilenceMs: optionalInt(env, 'BATCH_SILENCE_MS', DEFAULT_BATCH_SILENCE_MS),
     testServer: /^(1|true|yes)$/i.test(env.TELEGRAM_TEST_SERVER ?? ''),

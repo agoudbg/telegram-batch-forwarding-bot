@@ -31,6 +31,9 @@ export interface MediaCacheOptions {
   db: StorageDatabase;
   dataDir: string;
   origin: MediaOriginClient;
+  /** Maximum size of one cached media variant served through the web. */
+  maxMediaBytes: number;
+  /** Maximum combined size of completed cache entries. */
   maxBytes: number;
   lowWatermarkBytes: number;
   ttlSeconds: number;
@@ -113,13 +116,17 @@ export class MediaCache {
       const absolute = this.resolveCachePath(cached.path);
       try {
         const file = await stat(absolute);
-        const now = this.nowSeconds();
-        touchMediaCache(this.options.db, media.key, variant, now);
-        return {
-          contentType: variant === 'full' ? (media.mime ?? 'application/octet-stream') : await sniffImageMime(absolute),
-          size: file.size,
-          stream: (start, end, signal) => createReadStream(absolute, { start, end, signal }),
-        };
+        if (file.size > this.options.maxMediaBytes) {
+          await this.evict(media.key, variant, cached.path);
+        } else {
+          const now = this.nowSeconds();
+          touchMediaCache(this.options.db, media.key, variant, now);
+          return {
+            contentType: variant === 'full' ? (media.mime ?? 'application/octet-stream') : await sniffImageMime(absolute),
+            size: file.size,
+            stream: (start, end, signal) => createReadStream(absolute, { start, end, signal }),
+          };
+        }
       } catch {
         deleteMediaCache(this.options.db, media.key, variant);
       }
@@ -352,7 +359,7 @@ export class MediaCache {
   }
 
   private async reserve(expectedBytes: number): Promise<number> {
-    if (expectedBytes > this.options.maxBytes) throw new MediaFetchError(507);
+    if (expectedBytes > this.options.maxMediaBytes) throw new MediaFetchError(507);
     await this.withCapacityLock(async () => {
       await this.ensureCapacity(expectedBytes);
       this.reservedBytes += expectedBytes;
@@ -362,7 +369,7 @@ export class MediaCache {
 
   private async expandReservation(task: FetchTask, requiredBytes: number): Promise<void> {
     if (requiredBytes <= task.reservedBytes) return;
-    if (requiredBytes > this.options.maxBytes) throw new MediaFetchError(507);
+    if (requiredBytes > this.options.maxMediaBytes) throw new MediaFetchError(507);
     await this.withCapacityLock(async () => {
       const additionalBytes = requiredBytes - task.reservedBytes;
       await this.ensureCapacity(additionalBytes);
@@ -457,24 +464,24 @@ function growingFileStream(
       let position = start;
       const limit = end ?? Number.POSITIVE_INFINITY;
       for (;;) {
-          if (position <= limit && position < task.bytesWritten) {
-            const available = Math.min(task.bytesWritten - position, limit - position + 1, 256 * 1024);
-            const handle = await open(task.finalPath, 'r');
-            try {
-              const buffer = Buffer.allocUnsafe(available);
-              const { bytesRead } = await handle.read(buffer, 0, available, position);
-              if (bytesRead > 0) {
-                position += bytesRead;
-                yield buffer.subarray(0, bytesRead);
-                continue;
-              }
-            } finally {
-              await handle.close();
+        if (task.error !== null) throw task.error;
+        if (position <= limit && position < task.bytesWritten) {
+          const available = Math.min(task.bytesWritten - position, limit - position + 1, 256 * 1024);
+          const handle = await open(task.finalPath, 'r');
+          try {
+            const buffer = Buffer.allocUnsafe(available);
+            const { bytesRead } = await handle.read(buffer, 0, available, position);
+            if (bytesRead > 0) {
+              position += bytesRead;
+              yield buffer.subarray(0, bytesRead);
+              continue;
             }
+          } finally {
+            await handle.close();
           }
-          if (task.error !== null) throw task.error;
-          if (task.complete || position > limit) return;
-          await waitForProgress(task);
+        }
+        if (task.complete || position > limit) return;
+        await waitForProgress(task);
       }
     })(),
     { signal },

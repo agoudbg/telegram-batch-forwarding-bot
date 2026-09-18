@@ -76,6 +76,20 @@ describe('MediaCache', () => {
     expect(await cacheFiles(dataDir)).toEqual([]);
   });
 
+  it('enforces the single-media limit independently from total cache capacity', async () => {
+    const origin = new ChunkedOrigin([Buffer.from('12345678'), Buffer.from('overflow')]);
+    const { cache, db, dataDir } = await setupWithOrigin(origin, {
+      maxBytes: 100,
+      maxMediaBytes: 10,
+    });
+    const media = insertMedia(db, 'single-limit', null);
+
+    await expect(read(cache, media)).rejects.toThrow('Media origin returned 507');
+    expect(origin.cancelled).toBe(true);
+    expect(getMediaCache(db, 'single-limit', 'full')).toBeNull();
+    expect(await cacheFiles(dataDir)).toEqual([]);
+  });
+
   it('aborts a response larger than the database-declared size', async () => {
     const origin = new ChunkedOrigin(
       [Buffer.from('12345678'), Buffer.from('overflow')],
@@ -165,6 +179,7 @@ async function setup(
   bodies: Record<string, Buffer>,
   overrides: Partial<{
     maxBytes: number;
+    maxMediaBytes?: number;
     lowWatermarkBytes: number;
     ttlSeconds: number;
     now: () => number;
@@ -177,6 +192,7 @@ async function setupWithOrigin(
   origin: MediaOriginClient,
   overrides: Partial<{
     maxBytes: number;
+    maxMediaBytes?: number;
     lowWatermarkBytes: number;
     ttlSeconds: number;
     now: () => number;
@@ -190,6 +206,7 @@ async function setupWithOrigin(
     db,
     dataDir,
     origin,
+    maxMediaBytes: overrides.maxMediaBytes ?? overrides.maxBytes ?? 1024,
     maxBytes: overrides.maxBytes ?? 1024,
     lowWatermarkBytes: overrides.lowWatermarkBytes ?? 768,
     ttlSeconds: overrides.ttlSeconds ?? 86400,

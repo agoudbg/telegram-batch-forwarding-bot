@@ -15,7 +15,8 @@ pipeline.
   videos, polls, locations, contacts, replies, forwards and service messages
   through WebA.
 - Loads media from Telegram on first access, streams it with HTTP Range
-  support and keeps a bounded 24-hour/5 GiB local cache.
+  support and keeps a bounded 24-hour/5 GiB local cache. Full media above the
+  configurable 20 MiB web limit uses the Telegram fallback instead.
 - Serves public pages with share-scoped fake ids and no media access hashes,
   file references or Telegram data-center ids.
 - Revokes shares through `/delete <shareId or link>`, including by replying to

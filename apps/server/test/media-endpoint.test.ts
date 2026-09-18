@@ -180,6 +180,7 @@ describe('GET /media/:shareId/:key', () => {
           );
         },
       },
+      maxMediaBytes: 1024,
       maxBytes: 1024,
       lowWatermarkBytes: 768,
       ttlSeconds: 86400,
@@ -286,6 +287,7 @@ describe('GET /media/:shareId/:key', () => {
           headers: { 'Content-Type': 'text/plain' },
         })),
       },
+      maxMediaBytes: 1024,
       maxBytes: 1024,
       lowWatermarkBytes: 768,
       ttlSeconds: 86400,
@@ -304,8 +306,22 @@ describe('GET /media/:shareId/:key', () => {
     expect(cached.headers.get('Content-Length')).toBe(String(CONTENT.length));
   });
 
-  it('refuses legacy hosted media larger than the configured cache limit', async () => {
+  it('refuses legacy hosted media larger than the configured web limit', async () => {
     const { db, dataDir, fakeKey, url } = await setup();
+    const app = createServerApp({
+      db,
+      sanitizeSecret: SECRET,
+      dataDir,
+      maxHostedMediaBytes: CONTENT.length - 1,
+    });
+
+    expect(fakeKey).toBeTruthy();
+    expect((await app.request(url)).status).toBe(404);
+  });
+
+  it('refuses legacy hosted media whose on-disk size exceeds the web limit', async () => {
+    const { db, dataDir, fakeKey, url } = await setup();
+    db.prepare('UPDATE media SET size = NULL WHERE key = ?').run('12345');
     const app = createServerApp({
       db,
       sanitizeSecret: SECRET,

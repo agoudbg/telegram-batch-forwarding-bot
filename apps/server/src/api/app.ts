@@ -81,6 +81,7 @@ export interface ServerAppDeps {
   /** Public origin used for canonical and social preview URLs. */
   publicOrigin?: string;
   mediaCache?: MediaCache;
+  /** Maximum full-media size exposed through the share web path. */
   maxHostedMediaBytes?: number;
   mediaGovernor?: MediaRequestGovernor;
   trustedProxyIps?: readonly string[];

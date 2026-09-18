@@ -28,6 +28,7 @@ export interface MediaRouteDeps {
   /** Base directory holding media/ (media rows store paths relative to it) */
   dataDir: string;
   mediaCache?: MediaCache;
+  /** Maximum full-media size exposed through the share web path. */
   maxHostedMediaBytes?: number;
   mediaGovernor?: MediaRequestGovernor;
   trustedProxyIps?: readonly string[];
@@ -135,6 +136,9 @@ export function registerMediaRoutes(app: Hono, deps: MediaRouteDeps): void {
       size = (await stat(absPath)).size;
     } catch {
       return c.json({ error: 'not_found' }, 404); // registered but missing on disk
+    }
+    if (!isMediaWithinHostingLimit(size, deps.maxHostedMediaBytes)) {
+      return c.json({ error: 'not_found' }, 404);
     }
 
     // Thumbnails have no stored mime; document thumbs can be WebP (stickers)

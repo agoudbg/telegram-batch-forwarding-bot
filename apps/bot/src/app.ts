@@ -58,7 +58,7 @@ const FALLBACK_RATE_LIMIT_MS = 3000;
 export interface BotAppDeps {
   config: Pick<
     BotConfig,
-    'publicOrigin' | 'botUsername' | 'miniAppShortName' | 'batchSilenceMs' | 'mediaCacheMaxBytes'
+    'publicOrigin' | 'botUsername' | 'miniAppShortName' | 'batchSilenceMs' | 'mediaWebMaxBytes'
   >;
   db: StorageDatabase;
   ports: BotPorts;
@@ -307,7 +307,7 @@ export class BotApp {
     const pipeline = new MediaPipeline({
       db: this.deps.db,
       host: this.deps.ports,
-      maxHostedMediaBytes: this.deps.config.mediaCacheMaxBytes,
+      maxHostedMediaBytes: this.deps.config.mediaWebMaxBytes,
       log: this.deps.log,
     });
 

@@ -30,7 +30,7 @@ describe('loadConfig', () => {
       internalMediaPort: 3001,
       internalMediaHost: '127.0.0.1',
       internalMediaSecret: 'internal-test-secret',
-      mediaCacheMaxBytes: 5368709120,
+      mediaWebMaxBytes: 20 * 1024 * 1024,
       batchSilenceMs: 10000,
       testServer: false,
     });
@@ -71,11 +71,17 @@ describe('loadConfig', () => {
     );
   });
 
+  it('accepts a custom web media limit', () => {
+    expect(loadConfig({ ...BASE_ENV, MEDIA_WEB_MAX_BYTES: '1048576' }).mediaWebMaxBytes).toBe(
+      1048576,
+    );
+  });
+
   it('rejects non-numeric API_ID and invalid numeric overrides', () => {
     expect(() => loadConfig({ ...BASE_ENV, API_ID: 'abc' })).toThrow('API_ID');
     expect(() => loadConfig({ ...BASE_ENV, BATCH_SILENCE_MS: '-5' })).toThrow('BATCH_SILENCE_MS');
-    expect(() => loadConfig({ ...BASE_ENV, MEDIA_CACHE_MAX_BYTES: '1.5' })).toThrow(
-      'MEDIA_CACHE_MAX_BYTES',
+    expect(() => loadConfig({ ...BASE_ENV, MEDIA_WEB_MAX_BYTES: '1.5' })).toThrow(
+      'MEDIA_WEB_MAX_BYTES',
     );
   });
 });

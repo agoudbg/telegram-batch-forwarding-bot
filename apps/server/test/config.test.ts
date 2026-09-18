@@ -16,6 +16,7 @@ describe('loadServerConfig', () => {
       internalMediaPort: 3001,
       internalMediaHost: '127.0.0.1',
       internalMediaSecret: 'internal-secret',
+      mediaWebMaxBytes: 20 * 1024 * 1024,
       mediaCacheMaxBytes: 5 * 1024 * 1024 * 1024,
       mediaCacheLowWatermarkBytes: 4 * 1024 * 1024 * 1024,
       mediaCacheTtlSeconds: 86400,
@@ -52,10 +53,27 @@ describe('loadServerConfig', () => {
     expect(() =>
       loadServerConfig({
         ...BASE_ENV,
+        MEDIA_WEB_MAX_BYTES: '50',
         MEDIA_CACHE_MAX_BYTES: '100',
         MEDIA_CACHE_LOW_WATERMARK_BYTES: '100',
       }),
     ).toThrow('MEDIA_CACHE_LOW_WATERMARK_BYTES');
+  });
+
+  it('rejects a web media limit larger than the cache capacity', () => {
+    expect(() =>
+      loadServerConfig({
+        ...BASE_ENV,
+        MEDIA_WEB_MAX_BYTES: '200',
+        MEDIA_CACHE_MAX_BYTES: '100',
+      }),
+    ).toThrow('MEDIA_WEB_MAX_BYTES');
+  });
+
+  it('accepts a custom web media limit', () => {
+    expect(loadServerConfig({ ...BASE_ENV, MEDIA_WEB_MAX_BYTES: '1048576' }).mediaWebMaxBytes).toBe(
+      1048576,
+    );
   });
 
   it('only exposes the server when HOST is explicitly overridden', () => {
