@@ -132,9 +132,18 @@ export class RateLimiter {
  *  does not interleave with the next (docs/PLAN.md §6). */
 export class SendQueue {
   private tail: Promise<unknown> = Promise.resolve();
+  private pending = 0;
+
+  get isIdle(): boolean {
+    return this.pending === 0;
+  }
 
   enqueue<T>(job: () => Promise<T>): Promise<T> {
-    const result = this.tail.then(job, job);
+    this.pending += 1;
+    const run = () => Promise.resolve().then(job).finally(() => {
+      this.pending -= 1;
+    });
+    const result = this.tail.then(run, run);
     this.tail = result.catch(() => undefined);
     return result;
   }

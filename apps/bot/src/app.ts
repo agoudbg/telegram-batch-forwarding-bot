@@ -251,17 +251,24 @@ export class BotApp {
       }
 
       const reference = parseInputDocumentRef(media.reference);
-      await this.sendQueueFor(chatId).enqueue(() =>
-        withRetry(
-          () =>
-            this.deps.ports.sendDocumentByRef(
-              chatId,
-              reference,
-              `File from share ${shareId}, message #${seq + 1}`,
-            ),
-          { sleep: this.deps.sleep },
-        ),
-      );
+      const queue = this.sendQueueFor(chatId);
+      try {
+        await queue.enqueue(() =>
+          withRetry(
+            () =>
+              this.deps.ports.sendDocumentByRef(
+                chatId,
+                reference,
+                `File from share ${shareId}, message #${seq + 1}`,
+              ),
+            { sleep: this.deps.sleep },
+          ),
+        );
+      } finally {
+        if (queue.isIdle && this.sendQueues.get(chatId) === queue) {
+          this.sendQueues.delete(chatId);
+        }
+      }
     } catch (error) {
       this.deps.log?.(`media fallback failed for ${shareId}/${seq}: ${String(error)}`);
       await this.deps.ports

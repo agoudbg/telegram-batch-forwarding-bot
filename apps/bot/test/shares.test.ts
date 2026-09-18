@@ -142,10 +142,12 @@ describe('SendQueue', () => {
     const first = queue.enqueue(job('a'));
     const second = queue.enqueue(job('b', true));
     const third = queue.enqueue(job('c'));
+    expect(queue.isIdle).toBe(false);
 
     await expect(first).resolves.toBe('a');
     await expect(second).rejects.toThrow('b');
     await expect(third).resolves.toBe('c');
     expect(order).toEqual(['a', 'b', 'c']);
+    expect(queue.isIdle).toBe(true);
   });
 });
