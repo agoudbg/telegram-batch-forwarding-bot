@@ -140,7 +140,9 @@ the file reference, and streams the file to the HTTP server. Bots may use
   local media cache. These requests use `Cache-Control: no-store` and do not
   share an in-flight download with later requests.
 - The existing `get_<shareId>_<seq>` deep link remains a last-resort document
-  delivery path when the web download cannot be recovered.
+  delivery path when the web download cannot be recovered. When `seq` belongs
+  to a media group, the bot sends every oversized retrievable document in the
+  group sequentially, in share order, through one per-viewer send queue.
 - `MessageEntityCustomEmoji` documents are resolved through
   `messages.getCustomEmojiDocuments`, persisted as share media metadata, and
   fetched directly by the private media origin so custom emoji shares use the

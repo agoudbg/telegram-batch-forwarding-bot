@@ -11,9 +11,12 @@ import {
   getMessage,
   getShare,
   insertMessage,
+  listMessages,
   revokeShare,
   rewriteMessageSeqs,
 } from '@tbfb/server';
+import type { TLJsonObject, TLJsonValue } from '@tbfb/tlbridge';
+import { isTLJsonLong } from '@tbfb/tlbridge';
 
 import type { Batch } from './batching.js';
 import { BatchManager } from './batching.js';
@@ -214,9 +217,9 @@ export class BotApp {
     }
   }
 
-  /** /start get_<shareId>_<seq>: re-send an unhosted file by reusing its
-   *  InputDocument reference — a server-side copy inside Telegram, no
-   *  download/upload on our side (§2.5). Rate limited + queued. */
+  /** /start get_<shareId>_<seq>: re-send an unhosted file, or every
+   *  unhosted file from the selected album, by reusing InputDocument
+   *  references. Delivery is rate limited and serialized (§2.5). */
   private async handleGetFallback(chatId: string, shareId: string, seq: number): Promise<void> {
     if (!this.fallbackLimiter.allow(chatId)) {
       await this.deps.ports.sendText(chatId, '⏳ Slow down — try again in a few seconds.');
@@ -230,19 +233,64 @@ export class BotApp {
         return;
       }
 
-      const row = getMessage(this.deps.db, shareId, seq);
-      const info = row === null ? null : extractMediaInfo(JSON.parse(row.tlJson));
-      if (info === null) {
+      const selectedRow = getMessage(this.deps.db, shareId, seq);
+      if (selectedRow === null) {
         await this.deps.ports.sendText(chatId, 'That message has no file to deliver.');
         return;
       }
 
-      const media = getMedia(this.deps.db, info.key);
-      if (media === null) {
+      const selectedMessage = JSON.parse(selectedRow.tlJson) as TLJsonObject;
+      const groupedId = extractGroupedId(selectedMessage);
+      const relatedRows =
+        groupedId === undefined
+          ? [{ row: selectedRow, message: selectedMessage }]
+          : listMessages(this.deps.db, shareId).flatMap((row) => {
+              if (row.seq === selectedRow.seq) return [{ row, message: selectedMessage }];
+              try {
+                const message = JSON.parse(row.tlJson) as TLJsonObject;
+                return extractGroupedId(message) === groupedId ? [{ row, message }] : [];
+              } catch (error) {
+                this.deps.log?.(
+                  `media fallback skipped corrupt message ${shareId}/${row.seq}: ${String(error)}`,
+                );
+                return [];
+              }
+            });
+      const relatedMedia = relatedRows.flatMap(({ row, message }) => {
+        const info = extractMediaInfo(message);
+        if (info === null) return [];
+        const media = getMedia(this.deps.db, info.key);
+        return media === null ? [] : [{ seq: row.seq, media }];
+      });
+      if (relatedMedia.length === 0) {
         await this.deps.ports.sendText(chatId, 'That file is not available.');
         return;
       }
-      if (media.reference === null) {
+
+      const unhostedMedia = relatedMedia.filter(
+        ({ media }) =>
+          !media.hosted || (media.size !== null && media.size > this.deps.config.mediaWebMaxBytes),
+      );
+      const selectedMedia = relatedMedia.filter((item) => item.seq === seq);
+      const targets =
+        groupedId !== undefined && unhostedMedia.length > 0 ? unhostedMedia : selectedMedia;
+      const deliverable: Array<{ seq: number; reference: InputDocumentRef }> = [];
+      let unavailableCount = 0;
+      targets.forEach(({ seq: targetSeq, media }) => {
+        if (media.reference === null) {
+          unavailableCount += 1;
+          return;
+        }
+        try {
+          deliverable.push({ seq: targetSeq, reference: parseInputDocumentRef(media.reference) });
+        } catch (error) {
+          unavailableCount += 1;
+          this.deps.log?.(
+            `media fallback skipped invalid reference ${shareId}/${targetSeq}: ${String(error)}`,
+          );
+        }
+      });
+      if (deliverable.length === 0) {
         await this.deps.ports.sendText(
           chatId,
           'That file cannot be re-sent (Telegram provided no download reference). Open the share link instead.',
@@ -250,20 +298,35 @@ export class BotApp {
         return;
       }
 
-      const reference = parseInputDocumentRef(media.reference);
       const queue = this.sendQueueFor(chatId);
       try {
-        await queue.enqueue(() =>
-          withRetry(
-            () =>
-              this.deps.ports.sendDocumentByRef(
-                chatId,
-                reference,
-                `File from share ${shareId}, message #${seq + 1}`,
-              ),
-            { sleep: this.deps.sleep },
-          ),
-        );
+        let failedCount = 0;
+        await queue.enqueue(async () => {
+          for (const item of deliverable) {
+            try {
+              await withRetry(
+                () =>
+                  this.deps.ports.sendDocumentByRef(
+                    chatId,
+                    item.reference,
+                    `File from share ${shareId}, message #${item.seq + 1}`,
+                  ),
+                { sleep: this.deps.sleep },
+              );
+            } catch (error) {
+              failedCount += 1;
+              this.deps.log?.(
+                `media fallback item failed for ${shareId}/${item.seq}: ${String(error)}`,
+              );
+            }
+          }
+        });
+        if (failedCount + unavailableCount > 0) {
+          await this.deps.ports.sendText(
+            chatId,
+            `${failedCount + unavailableCount} file(s) could not be re-sent.`,
+          );
+        }
       } finally {
         if (queue.isIdle && this.sendQueues.get(chatId) === queue) {
           this.sendQueues.delete(chatId);
@@ -375,4 +438,10 @@ function parseInputDocumentRef(json: string): InputDocumentRef {
     accessHash: candidate.accessHash,
     fileReference: candidate.fileReference,
   };
+}
+
+function extractGroupedId(message: TLJsonObject): string | undefined {
+  const groupedId: TLJsonValue | undefined = message.groupedId;
+  if (groupedId !== undefined && isTLJsonLong(groupedId)) return groupedId.$long;
+  return typeof groupedId === 'number' ? groupedId.toString() : undefined;
 }

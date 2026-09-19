@@ -86,6 +86,7 @@ function forwardMessage(
     tlJson: {
       className: 'Message',
       id,
+      groupedId: groupedId === undefined ? undefined : { $long: groupedId },
       fwdFrom: {
         className: 'MessageFwdHeader',
         date: fwdDate,
@@ -97,7 +98,7 @@ function forwardMessage(
   };
 }
 
-function largeDocument(docId: string, withRef = true): TLJsonObject {
+function largeDocument(docId: string, withRef = true, size = 5000): TLJsonObject {
   return {
     media: {
       className: 'MessageMediaDocument',
@@ -106,7 +107,7 @@ function largeDocument(docId: string, withRef = true): TLJsonObject {
         id: { $long: docId },
         accessHash: withRef ? { $long: '555' } : undefined,
         fileReference: withRef ? { $bytes: 'aGk=' } : undefined,
-        size: { $long: '5000' },
+        size: { $long: size.toString() },
         mimeType: 'application/zip',
       },
     },
@@ -404,6 +405,25 @@ describe('BotApp', () => {
     await app.handleMessage(commandMessage('viewer', '/start get_share_1_0'));
     expect(docs).toHaveLength(1);
     expect(texts.at(-1)!.text).toContain('Slow down');
+  });
+
+  it('delivers every oversized file from a media group in message order', async () => {
+    const { app, docs } = await trackedSetup();
+    const groupedId = '7001';
+    await app.handleMessage(
+      forwardMessage('u1', 1, 100, largeDocument('1000', true, 500), '', groupedId),
+    );
+    await app.handleMessage(forwardMessage('u1', 2, 100, largeDocument('1001'), '', groupedId));
+    await app.handleMessage(forwardMessage('u1', 3, 100, largeDocument('1002'), '', groupedId));
+    await app.handleDoneCallback('u1');
+
+    await app.handleMessage(commandMessage('viewer', '/start get_share_1_0'));
+
+    expect(docs.map(({ ref }) => ref.id)).toEqual(['1001', '1002']);
+    expect(docs.map(({ caption }) => caption)).toEqual([
+      'File from share share_1, message #2',
+      'File from share share_1, message #3',
+    ]);
   });
 
   it('reports registered files without a reference as unresendable', async () => {
