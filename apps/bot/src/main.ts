@@ -39,6 +39,7 @@ function loadEnvFile(): void {
 }
 
 const STALE_PENDING_SHARE_SECONDS = 3600;
+const MAX_CUSTOM_EMOJI_DOCUMENTS_PER_REQUEST = 100;
 
 async function main(): Promise<void> {
   loadEnvFile();
@@ -174,6 +175,26 @@ function createTeleprotoPorts(client: TelegramClient): BotPorts {
         file: new Api.InputMediaDocument({ id: inputDocumentFromRef(ref) }),
         caption,
         forceDocument: true,
+      });
+    },
+
+    async fetchCustomEmojiDocuments(documentIds) {
+      if (documentIds.length === 0) return [];
+      const documents: Api.TypeDocument[] = [];
+      for (let index = 0; index < documentIds.length; index += MAX_CUSTOM_EMOJI_DOCUMENTS_PER_REQUEST) {
+        const chunk = documentIds.slice(index, index + MAX_CUSTOM_EMOJI_DOCUMENTS_PER_REQUEST);
+        documents.push(...await client.invoke(
+          new Api.messages.GetCustomEmojiDocuments({
+            documentId: chunk.map((documentId) => bigInt(documentId)),
+          }),
+        ));
+      }
+      return documents.flatMap((document) => {
+        const serialized = serializeTL(document);
+        if (typeof serialized !== 'object' || serialized === null || Array.isArray(serialized)) {
+          return [];
+        }
+        return [serialized as TLJsonObject];
       });
     },
 

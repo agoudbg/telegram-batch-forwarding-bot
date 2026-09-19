@@ -8,6 +8,7 @@ import type { StorageDatabase } from '@tbfb/server';
 import {
   insertMediaIfAbsent,
   linkMediaToShare,
+  upsertCustomEmojiDocument,
   upsertMediaSource,
   upsertPeer,
 } from '@tbfb/server';
@@ -82,42 +83,55 @@ export function extractMediaInfo(tlJson: TLJsonObject): MediaInfo | null {
 
   if (media.className === 'MessageMediaDocument') {
     const doc = asObject(media.document);
-    if (doc?.className !== 'Document') return null;
-    const id = idToString(doc.id);
-    if (id === undefined) return null;
-
-    const info: MediaInfo = {
-      kind: 'document',
-      key: mediaKeyFor('document', id),
-      size: longToNumber(doc.size),
-      mime: typeof doc.mimeType === 'string' ? doc.mimeType : undefined,
-      hasThumbnail: Array.isArray(doc.thumbs) && doc.thumbs.length > 0,
-    };
-
-    const attributes = Array.isArray(doc.attributes) ? doc.attributes : [];
-    for (const attribute of attributes) {
-      const attr = asObject(attribute);
-      if (
-        (attr?.className === 'DocumentAttributeVideo' ||
-          attr?.className === 'DocumentAttributeImageSize') &&
-        typeof attr.w === 'number' &&
-        typeof attr.h === 'number'
-      ) {
-        info.width = attr.w;
-        info.height = attr.h;
-        break;
-      }
-    }
-
-    const accessHash = idToString(doc.accessHash);
-    const fileReference = asObject(doc.fileReference);
-    if (accessHash !== undefined && typeof fileReference?.$bytes === 'string') {
-      info.documentRef = { id, accessHash, fileReference: fileReference.$bytes };
-    }
-    return info;
+    return doc?.className === 'Document' ? extractDocumentInfo(doc) : null;
   }
 
   return null;
+}
+
+/** Extract media metadata from a standalone Telegram Document. */
+export function extractDocumentInfo(doc: TLJsonObject): MediaInfo | null {
+  if (doc.className !== 'Document') return null;
+  const id = idToString(doc.id);
+  if (id === undefined) return null;
+
+  const info: MediaInfo = {
+    kind: 'document',
+    key: mediaKeyFor('document', id),
+    size: longToNumber(doc.size),
+    mime: typeof doc.mimeType === 'string' ? doc.mimeType : undefined,
+    hasThumbnail: Array.isArray(doc.thumbs) && doc.thumbs.length > 0,
+  };
+
+  const attributes = Array.isArray(doc.attributes) ? doc.attributes : [];
+  for (const attribute of attributes) {
+    const attr = asObject(attribute);
+    if (
+      (attr?.className === 'DocumentAttributeVideo' ||
+        attr?.className === 'DocumentAttributeImageSize') &&
+      typeof attr.w === 'number' &&
+      typeof attr.h === 'number'
+    ) {
+      info.width = attr.w;
+      info.height = attr.h;
+      break;
+    }
+  }
+
+  if (info.width === undefined || info.height === undefined) {
+    const lastThumb = asObject(Array.isArray(doc.thumbs) ? doc.thumbs.at(-1) : undefined);
+    if (typeof lastThumb?.w === 'number' && typeof lastThumb.h === 'number') {
+      info.width = lastThumb.w;
+      info.height = lastThumb.h;
+    }
+  }
+
+  const accessHash = idToString(doc.accessHash);
+  const fileReference = asObject(doc.fileReference);
+  if (accessHash !== undefined && typeof fileReference?.$bytes === 'string') {
+    info.documentRef = { id, accessHash, fileReference: fileReference.$bytes };
+  }
+  return info;
 }
 
 /** Extract only the first-hop forward origin. Retained as a narrow public
@@ -172,7 +186,7 @@ export async function withRetry<T>(fn: () => Promise<T>, options: RetryOptions =
 
 export interface MediaPipelineDeps {
   db: StorageDatabase;
-  host: Pick<BotPorts, 'resolvePeer'>;
+  host: Pick<BotPorts, 'resolvePeer' | 'fetchCustomEmojiDocuments'>;
   maxHostedMediaBytes: number;
   log?: (line: string) => void;
 }
@@ -219,8 +233,66 @@ export class MediaPipeline {
       }
     }
 
+    await this.processCustomEmojis(batch, result, onProgress);
     result.avatars = await this.processAvatars(batch);
     return result;
+  }
+
+  private async processCustomEmojis(
+    batch: Batch,
+    result: MediaProcessResult,
+    onProgress?: (text: string) => void,
+  ): Promise<void> {
+    const sources = collectCustomEmojiSources(batch);
+    if (sources.size === 0) return;
+
+    const documentIds = [...sources.keys()];
+    onProgress?.(`Custom emoji ${documentIds.length}…`);
+
+    let documents: TLJsonObject[];
+    try {
+      documents = await this.deps.host.fetchCustomEmojiDocuments(documentIds);
+    } catch (error) {
+      result.failed += documentIds.length;
+      this.deps.log?.(`custom emoji document lookup failed: ${String(error)}`);
+      return;
+    }
+
+    const documentsById = new Map<string, TLJsonObject>();
+    documents.forEach((document) => {
+      const id = idToString(document.id);
+      if (id !== undefined) documentsById.set(id, document);
+    });
+
+    for (const [documentId, source] of sources) {
+      const document = documentsById.get(documentId);
+      if (document === undefined) {
+        result.failed += 1;
+        this.deps.log?.(`custom emoji document ${documentId} was not returned`);
+        continue;
+      }
+
+      const info = extractDocumentInfo(document);
+      if (info === null) {
+        result.failed += 1;
+        this.deps.log?.(`custom emoji document ${documentId} has invalid metadata`);
+        continue;
+      }
+
+      try {
+        const outcome = this.processOne(info, source.sourcePeerId, source.sourceMessageId);
+        upsertCustomEmojiDocument(this.deps.db, {
+          mediaKey: info.key,
+          documentId,
+          tlJson: JSON.stringify(document),
+        });
+        linkMediaToShare(this.deps.db, batch.id, info.key);
+        result[outcome] += 1;
+      } catch (error) {
+        result.failed += 1;
+        this.deps.log?.(`custom emoji media registration failed for ${info.key}: ${String(error)}`);
+      }
+    }
   }
 
   private processOne(
@@ -305,4 +377,38 @@ export class MediaPipeline {
     }
     return count;
   }
+}
+
+function collectCustomEmojiSources(
+  batch: Batch,
+): Map<string, { sourcePeerId: string; sourceMessageId: number }> {
+  const sources = new Map<string, { sourcePeerId: string; sourceMessageId: number }>();
+  for (const item of batch.items) {
+    collectCustomEmojiIds(item.message.tlJson, (documentId) => {
+      if (!sources.has(documentId)) {
+        sources.set(documentId, {
+          sourcePeerId: item.message.chatId,
+          sourceMessageId: item.message.messageId,
+        });
+      }
+    });
+  }
+  return sources;
+}
+
+function collectCustomEmojiIds(value: TLJsonValue, onId: (documentId: string) => void): void {
+  if (Array.isArray(value)) {
+    value.forEach((item) => collectCustomEmojiIds(item, onId));
+    return;
+  }
+
+  const object = asObject(value);
+  if (object === undefined) return;
+  if (object.className === 'MessageEntityCustomEmoji') {
+    const documentId = idToString(object.documentId);
+    if (documentId !== undefined) onId(documentId);
+  }
+  Object.values(object).forEach((nested) => {
+    if (nested !== undefined) collectCustomEmojiIds(nested, onId);
+  });
 }

@@ -14,7 +14,13 @@ import { Hono } from 'hono';
 import type { TLJsonValue } from '@tbfb/tlbridge';
 
 import type { StorageDatabase } from '../storage/database.js';
-import { listMediaSources, listMessages, listPeers, listShareMedia } from '../storage/repository.js';
+import {
+  listMediaSources,
+  listMessages,
+  listPeers,
+  listShareCustomEmojiDocuments,
+  listShareMedia,
+} from '../storage/repository.js';
 import type { MediaCache, MediaOriginClient } from '../mediaCache.js';
 import type { MediaRequestGovernor } from '../mediaGovernor.js';
 import type { PeerKind } from '../storage/repository.js';
@@ -50,6 +56,8 @@ export interface ShareResponse {
    *  the message TL JSON. Avatar files are not listed here (they are served
    *  through peers[].avatarUrl). */
   media: Record<string, ShareMediaEntry>;
+  /** Sanitized custom emoji Documents used to seed the frontend sticker cache. */
+  customEmojis: TLJsonValue[];
   /** Bot username (no @) for the unhosted-media deep link
    *  `https://t.me/<bot>?start=get_<shareId>_<seq>` (§2.5); null when the
    *  server is not configured with BOT_USERNAME */
@@ -158,11 +166,16 @@ export function createServerApp(deps: ServerAppDeps): Hono {
       };
     }
 
+    const customEmojis = listShareCustomEmojiDocuments(deps.db, shareId).map((row) => (
+      sanitizer.sanitize(JSON.parse(row.tlJson) as TLJsonValue)
+    ));
+
     const response: ShareResponse = {
       share: { id: share.id, createdAt: share.createdAt, finalizedAt: share.finalizedAt },
       messages,
       peers,
       media,
+      customEmojis,
       botUsername: deps.botUsername ?? null,
     };
     return c.json(response);

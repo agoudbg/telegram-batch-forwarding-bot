@@ -11,7 +11,13 @@ export type { BotConfig } from './config.js';
 export { createBotLogger } from './logging.js';
 export { startMediaOrigin } from './mediaOrigin.js';
 export type { MediaOriginOptions } from './mediaOrigin.js';
-export { MediaPipeline, extractForwardPeer, extractMediaInfo, withRetry } from './media.js';
+export {
+  MediaPipeline,
+  extractDocumentInfo,
+  extractForwardPeer,
+  extractMediaInfo,
+  withRetry,
+} from './media.js';
 export type { MediaInfo, MediaProcessResult, RetryOptions } from './media.js';
 export type {
   BotPorts,

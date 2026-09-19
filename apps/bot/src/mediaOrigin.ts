@@ -11,6 +11,7 @@ import { Api, TelegramClient } from 'teleproto';
 
 import type { MediaCacheVariant, MediaSourceRow, StorageDatabase } from '@tbfb/server';
 import {
+  getCustomEmojiDocument,
   getMedia,
   listMediaSources,
   updateMediaReference,
@@ -102,6 +103,12 @@ async function handleRequest(
     return;
   }
 
+  const customEmoji = getCustomEmojiDocument(options.db, mediaKey);
+  if (customEmoji !== null) {
+    await streamCustomEmoji(options, customEmoji.documentId, media, variant, response);
+    return;
+  }
+
   const located = await findSourceMessage(options, mediaKey, sources);
   if (located === null) {
     response.writeHead(404).end();
@@ -133,6 +140,49 @@ async function handleRequest(
   await options.client.downloadMedia(located.message, {
     outputFile: response,
   });
+  if (!response.writableEnded) response.end();
+}
+
+async function streamCustomEmoji(
+  options: MediaOriginOptions,
+  documentId: string,
+  media: NonNullable<ReturnType<typeof getMedia>>,
+  variant: MediaCacheVariant,
+  response: ServerResponse,
+): Promise<void> {
+  const result = await options.client.invoke(
+    new Api.messages.GetCustomEmojiDocuments({ documentId: [bigInt(documentId)] }),
+  );
+  const document = result.find(
+    (candidate): candidate is Api.Document => candidate instanceof Api.Document,
+  );
+  if (document === undefined) {
+    response.writeHead(404).end();
+    return;
+  }
+
+  const mediaDocument = new Api.MessageMediaDocument({ document });
+  if (variant === 'thumb') {
+    const thumbnail = thumbnailIndexForDocument(document);
+    if (thumbnail === null) {
+      response.writeHead(404).end();
+      return;
+    }
+    const bytes = await options.client.downloadMedia(mediaDocument, { thumb: thumbnail });
+    if (!Buffer.isBuffer(bytes) || bytes.length === 0) {
+      response.writeHead(404).end();
+      return;
+    }
+    response.writeHead(200, {
+      'Content-Type': sniffImageMime(bytes),
+      'Content-Length': String(bytes.length),
+    });
+    response.end(bytes);
+    return;
+  }
+
+  response.writeHead(200, { 'Content-Type': media.mime ?? 'application/octet-stream' });
+  await options.client.downloadMedia(mediaDocument, { outputFile: response });
   if (!response.writableEnded) response.end();
 }
 
@@ -241,6 +291,11 @@ function thumbnailIndex(message: Api.Message): number | null {
     return count < 2 ? null : Math.min(1, count - 1);
   }
   return null;
+}
+
+function thumbnailIndexForDocument(document: Api.Document): number | null {
+  const count = document.thumbs?.length ?? 0;
+  return count === 0 ? null : count - 1;
 }
 
 function isAuthorized(header: string | undefined, secret: string): boolean {

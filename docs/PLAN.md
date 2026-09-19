@@ -141,6 +141,10 @@ the file reference, and streams the file to the HTTP server. Bots may use
   share an in-flight download with later requests.
 - The existing `get_<shareId>_<seq>` deep link remains a last-resort document
   delivery path when the web download cannot be recovered.
+- `MessageEntityCustomEmoji` documents are resolved through
+  `messages.getCustomEmojiDocuments`, persisted as share media metadata, and
+  fetched directly by the private media origin so custom emoji shares use the
+  same bounded cache and sanitized-document contract as ordinary stickers.
 
 ### 2.6 Security (public pages only ever get sanitized copies)
 

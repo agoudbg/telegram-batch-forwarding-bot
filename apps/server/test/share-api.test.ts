@@ -15,6 +15,7 @@ import {
   insertMessage,
   linkMediaToShare,
   revokeShare,
+  upsertCustomEmojiDocument,
   upsertPeer,
 } from '../src/storage/repository.js';
 
@@ -191,6 +192,74 @@ describe('GET /api/shares/:id', () => {
     });
     // Avatar files are served through peers[].avatarUrl, not the media map
     expect(Object.keys(body.media)).toHaveLength(2);
+  });
+
+  it('serves sanitized custom emoji Documents with matching media keys', async () => {
+    const db = openDatabase(':memory:');
+    const shareId = 'share-custom-emoji';
+    createShare(db, { id: shareId, ownerUserId: 'u1' });
+    insertMessage(db, {
+      shareId,
+      seq: 0,
+      tlJson: JSON.stringify({
+        className: 'Message',
+        message: '🙂',
+        entities: [{
+          className: 'MessageEntityCustomEmoji',
+          offset: 0,
+          length: 2,
+          documentId: { $long: REAL.document },
+        }],
+      }),
+    });
+    const mediaKey = `document_${REAL.document}`;
+    insertMediaIfAbsent(db, {
+      key: mediaKey,
+      hosted: true,
+      path: `media/${REAL.document}`,
+      mime: 'application/x-tgsticker',
+      size: 2048,
+    });
+    linkMediaToShare(db, shareId, mediaKey);
+    upsertCustomEmojiDocument(db, {
+      mediaKey,
+      documentId: REAL.document,
+      tlJson: JSON.stringify({
+        className: 'Document',
+        id: { $long: REAL.document },
+        accessHash: { $long: REAL.accessHash },
+        fileReference: { $bytes: 'AAEC' },
+        dcId: 4,
+        mimeType: 'application/x-tgsticker',
+        attributes: [{
+          className: 'DocumentAttributeCustomEmoji',
+          alt: '🙂',
+          stickerset: {
+            className: 'InputStickerSetID',
+            id: { $long: '101010' },
+            accessHash: { $long: '202020' },
+          },
+        }],
+      }),
+    });
+    finalizeShare(db, shareId);
+
+    const app = createServerApp({ db, sanitizeSecret: SECRET, dataDir: '/nonexistent' });
+    const { body } = await fetchShare(app, shareId);
+    const message = body.messages[0]!.message as any;
+    const customEmoji = body.customEmojis[0] as any;
+    const fakeDocumentId = message.entities[0].documentId.$long as string;
+
+    expect(customEmoji.id.$long).toBe(fakeDocumentId);
+    expect(body.media[`document_${fakeDocumentId}`]).toMatchObject({
+      hosted: true,
+      url: `/media/${shareId}/document_${fakeDocumentId}`,
+    });
+    expect(customEmoji.accessHash).toBeUndefined();
+    expect(customEmoji.fileReference).toBeUndefined();
+    expect(customEmoji.dcId).toBeUndefined();
+    expect(customEmoji.attributes[0].stickerset.id.$long).not.toBe('101010');
+    expect(JSON.stringify(body)).not.toContain(REAL.document);
   });
 
   it('flags unhosted media without a URL but with retrievability', async () => {

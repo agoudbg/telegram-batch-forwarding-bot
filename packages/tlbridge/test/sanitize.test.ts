@@ -73,6 +73,38 @@ describe('createSanitizer', () => {
     expect(out.id).toBe(123);
   });
 
+  it('remaps custom emoji document ids and sticker set ids', () => {
+    const s = createSanitizer({ shareSecret: 'share-a', virtualChatPeerId: '999' });
+    const out = s.sanitize({
+      className: 'Message',
+      entities: [{
+        className: 'MessageEntityCustomEmoji',
+        offset: 0,
+        length: 2,
+        documentId: { $long: '555000111' },
+      }],
+      media: {
+        className: 'MessageMediaDocument',
+        document: {
+          className: 'Document',
+          id: { $long: '555000111' },
+          attributes: [{
+            className: 'DocumentAttributeCustomEmoji',
+            alt: '🙂',
+            stickerset: {
+              className: 'InputStickerSetID',
+              id: { $long: '777000222' },
+            },
+          }],
+        },
+      },
+    }) as any;
+
+    expect(out.entities[0].documentId.$long).toBe(s.fakeId('555000111'));
+    expect(out.media.document.id.$long).toBe(out.entities[0].documentId.$long);
+    expect(out.media.document.attributes[0].stickerset.id.$long).toBe(s.fakeId('777000222'));
+  });
+
   it('remaps bare peer-id vectors used by special messages', () => {
     const s = createSanitizer({ shareSecret: 'share-a', virtualChatPeerId: '999' });
     const out = s.sanitize({

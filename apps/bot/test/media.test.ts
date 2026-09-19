@@ -7,7 +7,13 @@ import type { TLJsonObject } from '@tbfb/tlbridge';
 import type { Batch } from '../src/batching.js';
 import { MediaPipeline, extractMediaInfo, withRetry } from '../src/media.js';
 import type { BotPorts, PeerKind, ResolvedPeer } from '../src/ports.js';
-import { createShare, getMedia, listMediaSources, listPeers } from '@tbfb/server';
+import {
+  createShare,
+  getCustomEmojiDocument,
+  getMedia,
+  listMediaSources,
+  listPeers,
+} from '@tbfb/server';
 
 function photoMessage(photoId: string): TLJsonObject {
   return {
@@ -43,6 +49,36 @@ function documentMessage(docId: string, size: number, withRef = true): TLJsonObj
         attributes: [{ className: 'DocumentAttributeVideo', w: 640, h: 360, duration: 12 }],
       },
     },
+  };
+}
+
+function customEmojiMessage(documentId: string): TLJsonObject {
+  return {
+    className: 'Message',
+    message: '🙂',
+    entities: [{
+      className: 'MessageEntityCustomEmoji',
+      offset: 0,
+      length: 2,
+      documentId: { $long: documentId },
+    }],
+  };
+}
+
+function customEmojiDocument(documentId: string): TLJsonObject {
+  return {
+    className: 'Document',
+    id: { $long: documentId },
+    accessHash: { $long: '777' },
+    fileReference: { $bytes: 'ZW1vamk=' },
+    size: { $long: '240' },
+    mimeType: 'application/x-tgsticker',
+    thumbs: [{ className: 'PhotoSize', type: 's', w: 100, h: 100, size: 80 }],
+    attributes: [{
+      className: 'DocumentAttributeCustomEmoji',
+      alt: '🙂',
+      stickerset: { className: 'InputStickerSetShortName', shortName: 'test' },
+    }],
   };
 }
 
@@ -144,9 +180,10 @@ describe('withRetry', () => {
 });
 
 describe('MediaPipeline', () => {
-  async function setup() {
+  async function setup(customDocuments: TLJsonObject[] = []) {
     const db = openDatabase(':memory:');
-    const host: Pick<BotPorts, 'resolvePeer'> = {
+    const host: Pick<BotPorts, 'resolvePeer' | 'fetchCustomEmojiDocuments'> = {
+      fetchCustomEmojiDocuments: () => Promise.resolve(customDocuments),
       resolvePeer: (peerId, kind: PeerKind): Promise<ResolvedPeer | null> =>
         Promise.resolve(
           peerId === 'unresolvable'
@@ -221,6 +258,28 @@ describe('MediaPipeline', () => {
       kind: 'document',
       sourcePeerId: 'u1',
       sourceMessageId: 3,
+    });
+  });
+
+  it('registers custom emoji Documents referenced by message entities', async () => {
+    const document = customEmojiDocument('123123');
+    const { db, pipeline } = await setup([document]);
+    const result = await pipeline.processBatch(batch([{ tlJson: customEmojiMessage('123123') }]));
+
+    expect(result).toMatchObject({ hosted: 1, failed: 0 });
+    expect(getMedia(db, 'document_123123')).toMatchObject({
+      hosted: true,
+      mime: 'application/x-tgsticker',
+      width: 100,
+      height: 100,
+    });
+    expect(getCustomEmojiDocument(db, 'document_123123')).toMatchObject({
+      documentId: '123123',
+      tlJson: JSON.stringify(document),
+    });
+    expect(listMediaSources(db, 'document_123123')[0]).toMatchObject({
+      sourcePeerId: 'u1',
+      sourceMessageId: 1,
     });
   });
 

@@ -34,6 +34,12 @@ export interface MediaRow {
   thumbPath: string | null;
 }
 
+export interface CustomEmojiDocumentRow {
+  mediaKey: string;
+  documentId: string;
+  tlJson: string;
+}
+
 export type MediaSourceKind = 'document' | 'photo' | 'avatar';
 export type MediaCacheVariant = 'full' | 'thumb' | 'avatar';
 
@@ -367,6 +373,44 @@ export function listShareMedia(db: StorageDatabase, shareId: string): MediaRow[]
   return rows.map(toMediaRow);
 }
 
+export function upsertCustomEmojiDocument(
+  db: StorageDatabase,
+  document: CustomEmojiDocumentRow,
+): void {
+  db.prepare(
+    `INSERT INTO custom_emoji_documents (media_key, document_id, tl_json)
+     VALUES (?, ?, ?)
+     ON CONFLICT (media_key) DO UPDATE SET
+       document_id = excluded.document_id,
+       tl_json = excluded.tl_json`,
+  ).run(document.mediaKey, document.documentId, document.tlJson);
+}
+
+export function getCustomEmojiDocument(
+  db: StorageDatabase,
+  mediaKey: string,
+): CustomEmojiDocumentRow | null {
+  const row = db
+    .prepare(`SELECT * FROM custom_emoji_documents WHERE media_key = ?`)
+    .get(mediaKey) as any;
+  return row === undefined ? null : toCustomEmojiDocumentRow(row);
+}
+
+export function listShareCustomEmojiDocuments(
+  db: StorageDatabase,
+  shareId: string,
+): CustomEmojiDocumentRow[] {
+  const rows = db
+    .prepare(
+      `SELECT ced.* FROM custom_emoji_documents ced
+       JOIN share_media sm ON sm.media_key = ced.media_key
+       WHERE sm.share_id = ?
+       ORDER BY sm.media_key ASC`,
+    )
+    .all(shareId) as any[];
+  return rows.map(toCustomEmojiDocumentRow);
+}
+
 function toMediaRow(row: any): MediaRow {
   return {
     key: row.key,
@@ -378,6 +422,14 @@ function toMediaRow(row: any): MediaRow {
     width: row.width,
     height: row.height,
     thumbPath: row.thumb_path,
+  };
+}
+
+function toCustomEmojiDocumentRow(row: any): CustomEmojiDocumentRow {
+  return {
+    mediaKey: row.media_key,
+    documentId: row.document_id,
+    tlJson: row.tl_json,
   };
 }
 

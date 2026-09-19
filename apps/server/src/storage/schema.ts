@@ -98,4 +98,15 @@ export const MIGRATIONS: Migration[] = [
       CREATE INDEX media_cache_lru_idx ON media_cache(last_accessed_at);
     `,
   },
+  {
+    version: 4,
+    name: 'custom emoji documents',
+    sql: `
+      CREATE TABLE custom_emoji_documents (
+        media_key TEXT PRIMARY KEY REFERENCES media(key) ON DELETE CASCADE,
+        document_id TEXT NOT NULL,
+        tl_json TEXT NOT NULL
+      );
+    `,
+  },
 ];

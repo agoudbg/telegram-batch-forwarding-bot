@@ -129,12 +129,20 @@ export interface SanitizerOptions {
 
 const STRIPPED_KEYS = new Set(['accessHash', 'fileReference', 'dcId']);
 
-/** Entities whose id is bound to a real identity and must be remapped */
-const ENTITY_CLASSES = new Set(['User', 'Chat', 'Channel', 'Photo', 'Document']);
+/** TL objects whose id is bound to a real identity and must be remapped */
+const IDENTITY_CLASSES = new Set([
+  'User',
+  'Chat',
+  'Channel',
+  'Photo',
+  'Document',
+  'InputStickerSetID',
+]);
 
 /** Message classes: peerId/fromId/savedPeerId are replaced with the virtual
  *  peer (forwarder erasure) */
 const MESSAGE_CLASSES = new Set(['Message', 'MessageService']);
+const CUSTOM_EMOJI_ENTITY_CLASS = 'MessageEntityCustomEmoji';
 
 const FAKE_ID_BASE = 1n << 62n;
 const FAKE_ID_SPAN = 1n << 62n;
@@ -204,7 +212,7 @@ export function createSanitizer(options: SanitizerOptions): TLSanitizer {
       return out;
     }
 
-    const isEntity = className !== undefined && ENTITY_CLASSES.has(className);
+    const isIdentityObject = className !== undefined && IDENTITY_CLASSES.has(className);
     const isMessage = className !== undefined && MESSAGE_CLASSES.has(className);
 
     const out: TLJsonObject = {};
@@ -212,7 +220,10 @@ export function createSanitizer(options: SanitizerOptions): TLSanitizer {
     for (const [key, value] of Object.entries(obj)) {
       if (value === undefined || key === 'className') continue;
       if (STRIPPED_KEYS.has(key)) continue;
-      if (isEntity && key === 'id') {
+      if (
+        (isIdentityObject && key === 'id')
+        || (className === CUSTOM_EMOJI_ENTITY_CLASS && key === 'documentId')
+      ) {
         out[key] = remapIdValue(value);
         continue;
       }

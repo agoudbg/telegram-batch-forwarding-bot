@@ -12,6 +12,7 @@ import {
   finalizeShare,
   deleteMediaCache,
   getMediaCache,
+  getCustomEmojiDocument,
   getMedia,
   getMessage,
   getShare,
@@ -23,11 +24,13 @@ import {
   listMessages,
   listPeers,
   listShareMedia,
+  listShareCustomEmojiDocuments,
   revokeShare,
   rewriteMessageSeqs,
   touchMediaCache,
   upsertMediaCache,
   upsertMediaSource,
+  upsertCustomEmojiDocument,
   upsertPeer,
 } from '../src/storage/repository.js';
 
@@ -60,6 +63,7 @@ describe('openDatabase', () => {
       .all()
       .map((r) => (r as { name: string }).name);
     expect(tables).toEqual([
+      'custom_emoji_documents',
       'media',
       'media_cache',
       'media_sources',
@@ -220,6 +224,25 @@ describe('media', () => {
     });
 
     expect(listMediaSources(db, '123').map((source) => source.sourceMessageId)).toEqual([20, 10]);
+  });
+
+  it('stores custom emoji Documents alongside their media rows', () => {
+    const db = freshDb();
+    createShare(db, { id: 's1', ownerUserId: '42' });
+    insertMediaIfAbsent(db, { key: 'document_123', mime: 'application/x-tgsticker' });
+    linkMediaToShare(db, 's1', 'document_123');
+    upsertCustomEmojiDocument(db, {
+      mediaKey: 'document_123',
+      documentId: '123',
+      tlJson: '{"className":"Document"}',
+    });
+
+    expect(getCustomEmojiDocument(db, 'document_123')).toEqual({
+      mediaKey: 'document_123',
+      documentId: '123',
+      tlJson: '{"className":"Document"}',
+    });
+    expect(listShareCustomEmojiDocuments(db, 's1')).toHaveLength(1);
   });
 
   it('tracks cache entries and their LRU access time', () => {

@@ -9,6 +9,7 @@ import {
   getMedia,
   insertMediaIfAbsent,
   openDatabase,
+  upsertCustomEmojiDocument,
   upsertMediaSource,
 } from '@tbfb/server';
 
@@ -95,6 +96,63 @@ describe('media origin', () => {
       accessHash: '456',
       fileReference: Buffer.from('reference').toString('base64'),
     });
+  });
+
+  it('retrieves custom emoji Documents directly by document id', async () => {
+    const db = openDatabase(':memory:');
+    insertMediaIfAbsent(db, {
+      key: 'document_123',
+      hosted: true,
+      mime: 'application/x-tgsticker',
+      size: 999,
+    });
+    upsertCustomEmojiDocument(db, {
+      mediaKey: 'document_123',
+      documentId: '123',
+      tlJson: '{"className":"Document"}',
+    });
+
+    const document = new Api.Document({
+      id: bigInt(123),
+      accessHash: bigInt(456),
+      fileReference: Buffer.from('reference'),
+      date: 1,
+      mimeType: 'application/x-tgsticker',
+      size: bigInt(5),
+      dcId: 2,
+      thumbs: [new Api.PhotoSize({ type: 's', w: 100, h: 100, size: 5 })],
+      attributes: [],
+    });
+    let requestedId: string | undefined;
+    const client = {
+      invoke(request: Api.messages.GetCustomEmojiDocuments) {
+        requestedId = request.documentId[0]?.toString();
+        return Promise.resolve([document]);
+      },
+      downloadMedia(media: Api.MessageMediaDocument, options: { outputFile: Writable }) {
+        expect(media.document).toBe(document);
+        options.outputFile.write(Buffer.from('emoji'));
+        return Promise.resolve(undefined);
+      },
+    } as unknown as TelegramClient;
+
+    const server = await startMediaOrigin({
+      db,
+      client,
+      port: 0,
+      secret: 'test-secret',
+    });
+    servers.push(server);
+    const address = server.address();
+    if (address === null || typeof address === 'string') throw new Error('Expected a TCP address');
+
+    const response = await fetch(
+      `http://127.0.0.1:${address.port}/internal/media/document_123?variant=full`,
+      { headers: { Authorization: 'Bearer test-secret' } },
+    );
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe('emoji');
+    expect(requestedId).toBe('123');
   });
 
   it('rejects unauthenticated requests before querying Telegram', async () => {

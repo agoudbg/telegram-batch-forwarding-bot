@@ -45,6 +45,7 @@ function fakePorts() {
       docs.push({ chatId, ref, caption });
       return Promise.resolve();
     },
+    fetchCustomEmojiDocuments: () => Promise.resolve([]),
     deleteMessages: (chatId, messageIds) => {
       deleted.push({ chatId, messageIds });
       return Promise.resolve();
