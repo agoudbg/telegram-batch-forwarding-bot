@@ -1,9 +1,13 @@
 # telegram-batch-forwarding-bot
 
+[![View Shared Messages](docs/assets/readme-header.png)](https://t.me/shrmsgbot)
+
 Forward multiple Telegram messages to a bot and receive one public,
 read-only share page. The page also opens as a Telegram Mini App and renders
 the batch through the official Telegram WebA (`telegram-tt`) message
 pipeline.
+
+Try the official deployment [@shrmsgbot](https://t.me/shrmsgbot).
 
 ## Features
 
