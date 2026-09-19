@@ -48,12 +48,14 @@ afterAll(async () => {
 });
 
 describe('built web routes', () => {
-  it('redirects the root to the project homepage and serves share routes', async () => {
+  it('serves the Mini App root and share routes', async () => {
     const root = await app.request('/');
-    expect(root.status).toBe(302);
-    expect(root.headers.get('Location')).toBe(
-      'https://github.com/agoudbg/telegram-batch-forwarding-bot',
-    );
+    expect(root.status).toBe(200);
+    await expect(root.text()).resolves.toContain('share app');
+
+    const miniAppRoot = await app.request('/?tgWebAppStartParam=share-a');
+    expect(miniAppRoot.status).toBe(200);
+    await expect(miniAppRoot.text()).resolves.toContain('share app');
 
     const share = await app.request(
       'http://127.0.0.1:3000/s/share-a?utm_source=telegram',

@@ -197,7 +197,8 @@ function registerWebRoutes(app: Hono, webRoot: string, publicOrigin?: string): v
     c.header('X-Robots-Tag', 'noindex, nofollow');
     await next();
   });
-  app.get('/', (c) => c.redirect(PROJECT_GITHUB_URL));
+  // Mini App direct links open the configured origin and pass the share id to the frontend.
+  app.get('/', serveStatic({ path: indexPath }));
   const serveSharePreview = async (c: import('hono').Context) => {
     return c.html(renderSharePreviewHtml(await indexTemplate, c.req.url, publicOrigin));
   };
