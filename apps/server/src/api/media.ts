@@ -33,6 +33,8 @@ export interface MediaRouteDeps {
   mediaOrigin?: MediaOriginClient;
   /** Maximum full-media size exposed through the share web path. */
   maxHostedMediaBytes?: number;
+  /** Full-media size above which requests bypass the local cache. */
+  maxCacheFileBytes?: number;
   /** Abort a direct origin stream that does not make progress in time. */
   mediaDownloadTimeoutMs?: number;
   mediaGovernor?: MediaRequestGovernor;
@@ -103,7 +105,8 @@ export function registerMediaRoutes(app: Hono, deps: MediaRouteDeps): void {
     }
 
     const variant = media.key.startsWith('avatar_') ? 'avatar' : thumb ? 'thumb' : 'full';
-    if (relPath === null && deps.mediaCache !== undefined) {
+    const bypassCache = shouldBypassMediaCache(variant, media.size, deps.maxCacheFileBytes);
+    if (relPath === null && deps.mediaCache !== undefined && !bypassCache) {
       try {
         const cached = await deps.mediaCache.open(media, variant, c.req.raw.signal);
         return streamHandle(
@@ -350,6 +353,18 @@ export function isMediaWithinHostingLimit(
   maxHostedMediaBytes: number | undefined,
 ): boolean {
   return size === null || maxHostedMediaBytes === undefined || size <= maxHostedMediaBytes;
+}
+
+export function shouldBypassMediaCache(
+  variant: MediaCacheVariant,
+  size: number | null,
+  maxCacheFileBytes: number | undefined,
+): boolean {
+  return (
+    variant === 'full' &&
+    maxCacheFileBytes !== undefined &&
+    (size === null || size > maxCacheFileBytes)
+  );
 }
 
 function streamHandle(

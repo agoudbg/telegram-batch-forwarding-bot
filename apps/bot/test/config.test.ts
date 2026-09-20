@@ -30,7 +30,7 @@ describe('loadConfig', () => {
       internalMediaPort: 3001,
       internalMediaHost: '127.0.0.1',
       internalMediaSecret: 'internal-test-secret',
-      mediaWebMaxBytes: 20 * 1024 * 1024,
+      mediaWebMaxBytes: 512 * 1024 * 1024,
       batchSilenceMs: 10000,
       testServer: false,
     });

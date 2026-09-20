@@ -50,7 +50,7 @@ SQLite stores raw TL JSON      buildApiMessage → official render pipeline
 
 - Bots use MTProto for media delivery, so the Telegram fallback has no Bot API
   20MB artificial limit (the ceiling is Telegram's own 2GB/4GB). The share web
-  path separately defaults to a configurable 20 MiB full-media limit.
+  path separately defaults to a configurable 512 MiB full-media limit.
 - Requires `api_id/api_hash` from my.telegram.org (mandatory for MTProto).
 
 ### 2.2 TL layer tracking strategy (can the fork keep up with Telegram?)
@@ -123,9 +123,12 @@ the file reference, and streams the file to the HTTP server. Bots may use
 
 - The HTTP server tails the growing download for the first viewer and commits
   it atomically to a read-through cache when complete.
-- Full media served through the share web path defaults to a 20 MiB limit
+- Full media served through the share web path defaults to a 512 MiB limit
   (`MEDIA_WEB_MAX_BYTES`); larger media is marked `hosted:false` and uses the
   Telegram fallback link.
+- Full media above `MEDIA_CACHE_MAX_FILE_BYTES` (default 100 MiB) bypasses the
+  local cache and streams from the private Telegram origin with `no-store`.
+  The aggregate cache limit remains independent from both thresholds.
 - The on-disk cache defaults to a 24-hour idle TTL and a 5 GiB total hard
   limit. Expired entries are removed first; capacity pressure evicts LRU
   entries to 4 GiB. The total cache limit is independent from the per-media

@@ -24,7 +24,7 @@ export interface BotConfig {
 }
 
 const DEFAULT_INTERNAL_MEDIA_PORT = 3001;
-const DEFAULT_WEB_MEDIA_MAX_BYTES = 20 * 1024 * 1024;
+const DEFAULT_WEB_MEDIA_MAX_BYTES = 512 * 1024 * 1024;
 const DEFAULT_BATCH_SILENCE_MS = 10000;
 
 function required(env: NodeJS.ProcessEnv, name: string): string {

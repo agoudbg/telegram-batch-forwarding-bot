@@ -254,6 +254,78 @@ describe('GET /media/:shareId/:key', () => {
     });
   });
 
+  it('bypasses the cache for large full media while preserving Range streaming', async () => {
+    const dataDir = await mkdtemp(path.join(tmpdir(), 'tbfb-server-large-stream-'));
+    dirs.push(dataDir);
+    const db = openDatabase(':memory:');
+    const largeContent = Buffer.alloc(101, 0x61);
+    createShare(db, { id: SHARE_ID, ownerUserId: 'u1' });
+    insertMediaIfAbsent(db, {
+      key: 'large-stream',
+      hosted: true,
+      path: null,
+      mime: 'video/mp4',
+      size: largeContent.length,
+    });
+    upsertMediaSource(db, {
+      mediaKey: 'large-stream',
+      kind: 'document',
+      sourcePeerId: 'u1',
+      sourceMessageId: 10,
+      reference: '{}',
+    });
+    linkMediaToShare(db, SHARE_ID, 'large-stream');
+    finalizeShare(db, SHARE_ID);
+
+    let fetches = 0;
+    const cache = new MediaCache({
+      db,
+      dataDir,
+      origin: {
+        fetch: () => Promise.resolve(new Response(largeContent)),
+      },
+      maxMediaBytes: 100,
+      maxBytes: 1024,
+      lowWatermarkBytes: 768,
+      ttlSeconds: 86400,
+      sweepIntervalSeconds: 3600,
+    });
+    caches.push(cache);
+    const app = createServerApp({
+      db,
+      sanitizeSecret: SECRET,
+      dataDir,
+      mediaCache: cache,
+      mediaOrigin: {
+        fetch: () => {
+          fetches += 1;
+          return Promise.resolve(
+            new Response(largeContent, {
+              headers: {
+                'Content-Type': 'video/mp4',
+                'Content-Length': String(largeContent.length),
+              },
+            }),
+          );
+        },
+      },
+      maxHostedMediaBytes: 512,
+      maxCacheFileBytes: 100,
+    });
+    const fakeKey = sanitizeMediaKey(createShareSanitizer(SECRET, SHARE_ID), 'large-stream');
+    const url = `/media/${SHARE_ID}/${fakeKey}`;
+
+    const response = await app.request(url, { headers: { Range: 'bytes=90-' } });
+    expect(response.status).toBe(206);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    expect(response.headers.get('Content-Range')).toBe('bytes 90-100/101');
+    expect(await response.text()).toBe('aaaaaaaaaaa');
+    expect(fetches).toBe(1);
+    expect(db.prepare('SELECT COUNT(*) AS count FROM media_cache').get()).toMatchObject({
+      count: 0,
+    });
+  });
+
   it('answers 416 for unsatisfiable ranges', async () => {
     const { app, url } = await setup();
     const res = await app.request(url, { headers: { Range: 'bytes=50-60' } });

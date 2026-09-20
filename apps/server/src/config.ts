@@ -26,6 +26,7 @@ export interface ServerConfig {
   internalMediaSecret: string;
   mediaWebMaxBytes: number;
   mediaCacheEnabled: boolean;
+  mediaCacheMaxFileBytes: number;
   mediaCacheMaxBytes: number;
   mediaCacheLowWatermarkBytes: number;
   mediaCacheTtlSeconds: number;
@@ -40,7 +41,8 @@ export interface ServerConfig {
 
 const DEFAULT_PORT = 3000;
 const DEFAULT_INTERNAL_MEDIA_PORT = 3001;
-const DEFAULT_WEB_MEDIA_MAX_BYTES = 20 * 1024 * 1024;
+const DEFAULT_WEB_MEDIA_MAX_BYTES = 512 * 1024 * 1024;
+const DEFAULT_CACHE_MAX_FILE_BYTES = 100 * 1024 * 1024;
 const DEFAULT_CACHE_MAX_BYTES = 5 * 1024 * 1024 * 1024;
 const DEFAULT_CACHE_LOW_WATERMARK_BYTES = 4 * 1024 * 1024 * 1024;
 
@@ -78,14 +80,15 @@ export function loadServerConfig(env: NodeJS.ProcessEnv = process.env): ServerCo
   if (!Number.isInteger(port) || port <= 0 || port > 65535) {
     throw new Error(`Environment variable PORT must be a valid port number, got ${portValue}`);
   }
-  const mediaWebMaxBytes = positiveInt(
+  const mediaWebMaxBytes = positiveInt(env, 'MEDIA_WEB_MAX_BYTES', DEFAULT_WEB_MEDIA_MAX_BYTES);
+  const mediaCacheMaxFileBytes = positiveInt(
     env,
-    'MEDIA_WEB_MAX_BYTES',
-    DEFAULT_WEB_MEDIA_MAX_BYTES,
+    'MEDIA_CACHE_MAX_FILE_BYTES',
+    DEFAULT_CACHE_MAX_FILE_BYTES,
   );
   const mediaCacheMaxBytes = positiveInt(env, 'MEDIA_CACHE_MAX_BYTES', DEFAULT_CACHE_MAX_BYTES);
-  if (mediaWebMaxBytes > mediaCacheMaxBytes) {
-    throw new Error('MEDIA_WEB_MAX_BYTES must not exceed MEDIA_CACHE_MAX_BYTES');
+  if (mediaCacheMaxFileBytes > mediaCacheMaxBytes) {
+    throw new Error('MEDIA_CACHE_MAX_FILE_BYTES must not exceed MEDIA_CACHE_MAX_BYTES');
   }
   const mediaCacheLowWatermarkBytes = positiveInt(
     env,
@@ -113,6 +116,7 @@ export function loadServerConfig(env: NodeJS.ProcessEnv = process.env): ServerCo
         : env.INTERNAL_MEDIA_SECRET,
     mediaWebMaxBytes,
     mediaCacheEnabled: booleanFlag(env, 'MEDIA_CACHE_ENABLED', true),
+    mediaCacheMaxFileBytes,
     mediaCacheMaxBytes,
     mediaCacheLowWatermarkBytes,
     mediaCacheTtlSeconds: positiveInt(env, 'MEDIA_CACHE_TTL_SECONDS', 86400),

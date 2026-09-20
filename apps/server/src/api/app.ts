@@ -93,6 +93,8 @@ export interface ServerAppDeps {
   mediaOrigin?: MediaOriginClient;
   /** Maximum full-media size exposed through the share web path. */
   maxHostedMediaBytes?: number;
+  /** Full-media size above which requests bypass the local cache. */
+  maxCacheFileBytes?: number;
   /** Abort a direct origin stream that does not make progress in time. */
   mediaDownloadTimeoutMs?: number;
   mediaGovernor?: MediaRequestGovernor;

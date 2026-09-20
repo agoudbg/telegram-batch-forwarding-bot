@@ -16,8 +16,9 @@ describe('loadServerConfig', () => {
       internalMediaPort: 3001,
       internalMediaHost: '127.0.0.1',
       internalMediaSecret: 'internal-secret',
-      mediaWebMaxBytes: 20 * 1024 * 1024,
+      mediaWebMaxBytes: 512 * 1024 * 1024,
       mediaCacheEnabled: true,
+      mediaCacheMaxFileBytes: 100 * 1024 * 1024,
       mediaCacheMaxBytes: 5 * 1024 * 1024 * 1024,
       mediaCacheLowWatermarkBytes: 4 * 1024 * 1024 * 1024,
       mediaCacheTtlSeconds: 86400,
@@ -55,20 +56,34 @@ describe('loadServerConfig', () => {
       loadServerConfig({
         ...BASE_ENV,
         MEDIA_WEB_MAX_BYTES: '50',
+        MEDIA_CACHE_MAX_FILE_BYTES: '50',
         MEDIA_CACHE_MAX_BYTES: '100',
         MEDIA_CACHE_LOW_WATERMARK_BYTES: '100',
       }),
     ).toThrow('MEDIA_CACHE_LOW_WATERMARK_BYTES');
   });
 
-  it('rejects a web media limit larger than the cache capacity', () => {
-    expect(() =>
+  it('keeps the web limit independent from total cache capacity', () => {
+    expect(
       loadServerConfig({
         ...BASE_ENV,
         MEDIA_WEB_MAX_BYTES: '200',
+        MEDIA_CACHE_MAX_FILE_BYTES: '50',
         MEDIA_CACHE_MAX_BYTES: '100',
+        MEDIA_CACHE_LOW_WATERMARK_BYTES: '50',
+      }).mediaWebMaxBytes,
+    ).toBe(200);
+  });
+
+  it('rejects a single-file cache limit larger than total capacity', () => {
+    expect(() =>
+      loadServerConfig({
+        ...BASE_ENV,
+        MEDIA_CACHE_MAX_FILE_BYTES: '101',
+        MEDIA_CACHE_MAX_BYTES: '100',
+        MEDIA_CACHE_LOW_WATERMARK_BYTES: '50',
       }),
-    ).toThrow('MEDIA_WEB_MAX_BYTES');
+    ).toThrow('MEDIA_CACHE_MAX_FILE_BYTES');
   });
 
   it('accepts a custom web media limit', () => {

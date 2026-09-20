@@ -20,7 +20,8 @@ Try the official deployment [@shrmsgbot](https://t.me/shrmsgbot).
   through WebA.
 - Loads media from Telegram on first access, streams it with HTTP Range
   support and keeps a bounded 24-hour/5 GiB local cache. Full media above the
-  configurable 20 MiB web limit uses the Telegram fallback instead.
+  configurable 100 MiB cache-entry limit streams without local persistence,
+  while media above the 512 MiB web limit uses the Telegram fallback instead.
 - `MEDIA_CACHE_ENABLED=false` keeps the authenticated media endpoint but
   streams each request without writing a local media cache.
 - Serves public pages with share-scoped fake ids and no media access hashes,
