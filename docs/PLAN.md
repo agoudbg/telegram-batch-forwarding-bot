@@ -147,6 +147,9 @@ the file reference, and streams the file to the HTTP server. Bots may use
   remaining hosted media grouped, preserves the group caption, appends the
   actual omitted count using singular or plural wording, and exposes one
   Telegram fallback button for the omitted files.
+- Inside a Telegram Mini App, Telegram fallback links use
+  `Telegram.WebApp.openTelegramLink` so supported clients retain the Mini App.
+  Browsers and clients without that method keep the external-window fallback.
 - `MessageEntityCustomEmoji` documents are resolved through
   `messages.getCustomEmojiDocuments`, persisted as share media metadata, and
   fetched directly by the private media origin so custom emoji shares use the
