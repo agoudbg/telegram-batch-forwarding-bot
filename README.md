@@ -1,4 +1,4 @@
-# telegram-batch-forwarding-bot
+# Telegram Batch Forwarding Bot
 
 [![View Shared Messages](docs/assets/readme-header.png)](https://t.me/shrmsgbot)
 
