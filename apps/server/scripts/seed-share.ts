@@ -230,16 +230,19 @@ const UNHOSTED = {
   photo: {
     id: '800008', file: 'photo.png', mime: 'image/png', width: 640, height: 360,
   },
+  file: { id: '800010', file: 'hello.txt', mime: 'application/zip' },
 } satisfies Record<string, MediaFixture>;
 
 // Mirrors the InputDocument JSON the bot persists for oversized files; only
 // its presence matters here (it makes the media row `retrievable`)
-const FAKE_REFERENCE = JSON.stringify({
-  className: 'InputDocument',
-  id: { $long: '800007' },
-  accessHash: { $long: '1' },
-  fileReference: { $bytes: 'AAEC' },
-});
+function fakeReference(id: string) {
+  return JSON.stringify({
+    className: 'InputDocument',
+    id: { $long: id },
+    accessHash: { $long: '1' },
+    fileReference: { $bytes: 'AAEC' },
+  });
+}
 
 const UNHOSTED_MESSAGES = [
   makeMessage(1, {
@@ -253,6 +256,51 @@ const UNHOSTED_MESSAGES = [
   }),
   makeMessage(2, {
     media: photoMedia(UNHOSTED.photo),
+  }),
+];
+
+const MIXED_ALBUM_GROUP_ID = '777000778';
+const MIXED_ALBUM_MESSAGES = [
+  makeMessage(1, {
+    media: photoMedia(MEDIA.photo2),
+    groupedId: { $long: MIXED_ALBUM_GROUP_ID },
+  }),
+  makeMessage(2, {
+    message: 'Mixed album caption',
+    media: documentMedia(UNHOSTED.video, [
+      {
+        className: 'DocumentAttributeVideo', w: 640, h: 360, duration: 3, supportsStreaming: true,
+      },
+      { className: 'DocumentAttributeFilename', fileName: 'video.mp4' },
+    ], VIDEO_THUMBS),
+    groupedId: { $long: MIXED_ALBUM_GROUP_ID },
+  }),
+  makeMessage(3, {
+    media: photoMedia(MEDIA.photo),
+    groupedId: { $long: MIXED_ALBUM_GROUP_ID },
+  }),
+];
+
+const MIXED_DOCUMENT_GROUP_ID = '777000779';
+const MIXED_DOCUMENT_GROUP_MESSAGES = [
+  makeMessage(1, {
+    media: documentMedia(MEDIA.file, [
+      { className: 'DocumentAttributeFilename', fileName: 'hello.txt' },
+    ]),
+    groupedId: { $long: MIXED_DOCUMENT_GROUP_ID },
+  }),
+  makeMessage(2, {
+    message: 'Mixed document group caption',
+    media: documentMedia(UNHOSTED.file, [
+      { className: 'DocumentAttributeFilename', fileName: 'too-large.zip' },
+    ]),
+    groupedId: { $long: MIXED_DOCUMENT_GROUP_ID },
+  }),
+  makeMessage(3, {
+    media: documentMedia(MEDIA.file, [
+      { className: 'DocumentAttributeFilename', fileName: 'hello.txt' },
+    ]),
+    groupedId: { $long: MIXED_DOCUMENT_GROUP_ID },
   }),
 ];
 
@@ -491,6 +539,8 @@ function main(): void {
   seedShare(db, 'demo-text', [...TEXT_MESSAGES, NESTED_MESSAGE]);
   seedShare(db, 'demo-media', MEDIA_MESSAGES);
   seedShare(db, 'demo-unhosted', UNHOSTED_MESSAGES);
+  seedShare(db, 'demo-mixed-album', MIXED_ALBUM_MESSAGES);
+  seedShare(db, 'demo-mixed-document-group', MIXED_DOCUMENT_GROUP_MESSAGES);
   Object.entries(TYPE_BATCHES).forEach(([type, messages]) => {
     seedShare(db, `demo-type-${type}`, messages);
   });
@@ -519,6 +569,12 @@ function main(): void {
     });
     linkMediaToShare(db, 'demo-media', fixture.id);
     linkMediaToShare(db, 'demo-types', fixture.id);
+    if (fixture === MEDIA.photo || fixture === MEDIA.photo2) {
+      linkMediaToShare(db, 'demo-mixed-album', fixture.id);
+    }
+    if (fixture === MEDIA.file) {
+      linkMediaToShare(db, 'demo-mixed-document-group', fixture.id);
+    }
     for (const type of ['photo', 'album', 'video', 'file', 'sticker', 'voice', 'round']) {
       linkMediaToShare(db, `demo-type-${type}`, fixture.id);
     }
@@ -531,13 +587,22 @@ function main(): void {
     mime: UNHOSTED.video.mime,
     size: 734003200,
     hosted: false,
-    reference: FAKE_REFERENCE,
+    reference: fakeReference(UNHOSTED.video.id),
     width: UNHOSTED.video.width,
     height: UNHOSTED.video.height,
   });
   linkMediaToShare(db, 'demo-unhosted', UNHOSTED.video.id);
   linkMediaToShare(db, 'demo-types', UNHOSTED.video.id);
   linkMediaToShare(db, 'demo-type-unhosted', UNHOSTED.video.id);
+  linkMediaToShare(db, 'demo-mixed-album', UNHOSTED.video.id);
+  insertMediaIfAbsent(db, {
+    key: UNHOSTED.file.id,
+    mime: UNHOSTED.file.mime,
+    size: 734003200,
+    hosted: false,
+    reference: fakeReference(UNHOSTED.file.id),
+  });
+  linkMediaToShare(db, 'demo-mixed-document-group', UNHOSTED.file.id);
   insertMediaIfAbsent(db, {
     key: UNHOSTED.photo.id,
     mime: UNHOSTED.photo.mime,
