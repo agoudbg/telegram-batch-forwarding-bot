@@ -144,9 +144,9 @@ the file reference, and streams the file to the HTTP server. Bots may use
   to a media group, the bot sends every oversized retrievable document in the
   group sequentially, in share order, through one per-viewer send queue.
 - Share View removes only oversized entries from a media group. It keeps the
-  remaining hosted media grouped, preserves the group caption, appends
-  `[File(s) are too large to display online]`, and exposes one Telegram
-  fallback button for the omitted files.
+  remaining hosted media grouped, preserves the group caption, appends the
+  actual omitted count using singular or plural wording, and exposes one
+  Telegram fallback button for the omitted files.
 - `MessageEntityCustomEmoji` documents are resolved through
   `messages.getCustomEmojiDocuments`, persisted as share media metadata, and
   fetched directly by the private media origin so custom emoji shares use the

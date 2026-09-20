@@ -279,6 +279,24 @@ const MIXED_ALBUM_MESSAGES = [
     media: photoMedia(MEDIA.photo),
     groupedId: { $long: MIXED_ALBUM_GROUP_ID },
   }),
+  makeMessage(4, {
+    media: documentMedia(UNHOSTED.video, [
+      {
+        className: 'DocumentAttributeVideo', w: 640, h: 360, duration: 3, supportsStreaming: true,
+      },
+      { className: 'DocumentAttributeFilename', fileName: 'video.mp4' },
+    ], VIDEO_THUMBS),
+    groupedId: { $long: MIXED_ALBUM_GROUP_ID },
+  }),
+  makeMessage(5, {
+    media: documentMedia(UNHOSTED.video, [
+      {
+        className: 'DocumentAttributeVideo', w: 640, h: 360, duration: 3, supportsStreaming: true,
+      },
+      { className: 'DocumentAttributeFilename', fileName: 'video.mp4' },
+    ], VIDEO_THUMBS),
+    groupedId: { $long: MIXED_ALBUM_GROUP_ID },
+  }),
 ];
 
 const MIXED_DOCUMENT_GROUP_ID = '777000779';
