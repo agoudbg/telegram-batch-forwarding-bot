@@ -311,7 +311,8 @@ it later.
   `KeyboardButtonUrl` button; add a separate `Share` button using the
   `t.me/share/url?url=<mini-app-link>` deep link; the public HTTPS URL stays
   internal; add `Copy Link` beside `Share` using `KeyboardButtonCopy`;
-  /delete revokes
+  use primary blue styling for Mini App and Copy Link and success green
+  styling for Share; /delete revokes
 - `/start get_<shareId>_<seq>` payload → verify public → re-send the file by
   reusing the InputDocument (FloodWait queue + rate limit)
 - Acceptance: manual end-to-end (API returning JSON suffices before web is

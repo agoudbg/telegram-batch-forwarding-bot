@@ -13,6 +13,7 @@ import type { TLJsonObject } from '@tbfb/tlbridge';
 import { openDatabase, deleteStalePendingShares } from '@tbfb/server';
 
 import { BotApp } from './app.js';
+import { buildButtons } from './buttons.js';
 import { loadConfig } from './config.js';
 import { registerBotCommands } from './commands.js';
 import { createBotLogger } from './logging.js';
@@ -251,64 +252,6 @@ function inputDocumentFromRef(ref: InputDocumentRef): Api.InputDocument {
     id: bigInt(ref.id),
     accessHash: bigInt(ref.accessHash),
     fileReference: Buffer.from(ref.fileReference, 'base64'),
-  });
-}
-
-type SendTextOptions = Parameters<BotPorts['sendText']>[2];
-
-function buildButtons(opts: SendTextOptions): Api.ReplyInlineMarkup | undefined {
-  const rows: Api.KeyboardButtonRow[] = [];
-  if (opts?.doneButton === true) {
-    rows.push(
-      new Api.KeyboardButtonRow({
-        buttons: [
-          new Api.KeyboardButtonCallback({
-            text: '✅ Done — generate link',
-            data: Buffer.from('done'),
-          }),
-        ],
-      }),
-    );
-  }
-  if (opts?.miniAppButton !== undefined) {
-    rows.push(
-      new Api.KeyboardButtonRow({
-        buttons: [
-          new Api.KeyboardButtonUrl({
-            text: opts.miniAppButton.text,
-            url: opts.miniAppButton.url,
-          }),
-        ],
-      }),
-    );
-  }
-  const shareButtons: Api.TypeKeyboardButton[] = [];
-  if (opts?.shareButton !== undefined) {
-    shareButtons.push(
-      new Api.KeyboardButtonUrl({
-        text: opts.shareButton.text,
-        url: opts.shareButton.url,
-      }),
-    );
-  }
-  if (opts?.copyTextButton !== undefined) {
-    shareButtons.push(
-      new Api.KeyboardButtonCopy({
-        text: opts.copyTextButton.text,
-        copyText: opts.copyTextButton.copyText,
-      }),
-    );
-  }
-  if (shareButtons.length > 0) {
-    rows.push(
-      new Api.KeyboardButtonRow({
-        buttons: shareButtons,
-      }),
-    );
-  }
-  if (rows.length === 0) return undefined;
-  return new Api.ReplyInlineMarkup({
-    rows,
   });
 }
 
