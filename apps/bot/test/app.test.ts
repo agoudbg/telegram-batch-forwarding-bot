@@ -181,6 +181,9 @@ describe('BotApp', () => {
     expect(reply.opts?.shareButton?.url).toBe(
       'https://t.me/share/url?url=https%3A%2F%2Ft.me%2Fmybot%2Fview%3Fstartapp%3Dshare_1',
     );
+    expect(reply.opts?.copyTextButton?.copyText).toBe(
+      'https://t.me/mybot/view?startapp=share_1',
+    );
 
     // The collecting prompt (id 1) and the processing status (id 2) are
     // deleted once the share is ready

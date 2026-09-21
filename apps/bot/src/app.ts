@@ -400,6 +400,8 @@ export class BotApp {
           : { text: 'Open in Mini App', url: links.directLink },
       shareButton:
         links.shareLink === null ? undefined : { text: 'Share', url: links.shareLink },
+      copyTextButton:
+        links.directLink === null ? undefined : { text: 'Copy Link', copyText: links.directLink },
     });
 
     // The share is ready: remove the transient prompt/status messages

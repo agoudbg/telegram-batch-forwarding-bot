@@ -282,15 +282,27 @@ function buildButtons(opts: SendTextOptions): Api.ReplyInlineMarkup | undefined 
       }),
     );
   }
+  const shareButtons: Api.TypeKeyboardButton[] = [];
   if (opts?.shareButton !== undefined) {
+    shareButtons.push(
+      new Api.KeyboardButtonUrl({
+        text: opts.shareButton.text,
+        url: opts.shareButton.url,
+      }),
+    );
+  }
+  if (opts?.copyTextButton !== undefined) {
+    shareButtons.push(
+      new Api.KeyboardButtonCopy({
+        text: opts.copyTextButton.text,
+        copyText: opts.copyTextButton.copyText,
+      }),
+    );
+  }
+  if (shareButtons.length > 0) {
     rows.push(
       new Api.KeyboardButtonRow({
-        buttons: [
-          new Api.KeyboardButtonUrl({
-            text: opts.shareButton.text,
-            url: opts.shareButton.url,
-          }),
-        ],
+        buttons: shareButtons,
       }),
     );
   }

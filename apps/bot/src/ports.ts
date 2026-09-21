@@ -28,6 +28,8 @@ export interface SendTextOptions {
   miniAppButton?: { text: string; url: string };
   /** Attach an inline URL button opening Telegram's share chooser */
   shareButton?: { text: string; url: string };
+  /** Attach an inline button copying text to the clipboard */
+  copyTextButton?: { text: string; copyText: string };
 }
 
 /** Everything needed to re-send an unhosted file server-side
