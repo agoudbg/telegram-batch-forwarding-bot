@@ -158,7 +158,7 @@ describe('BotApp', () => {
     expect(texts[2]!.text).toContain('PUBLIC');
   });
 
-  it('collects a batch, finalizes it into a public share and replies with links', async () => {
+  it('collects a batch, finalizes it into a public share and replies with the Mini App link', async () => {
     const { app, db, texts, deleted } = await trackedSetup();
 
     await app.handleMessage(forwardMessage('u1', 1, 100));
@@ -175,9 +175,9 @@ describe('BotApp', () => {
     expect(messages.map((m) => m.nestedForward)).toEqual([false, true]);
 
     const reply = texts.at(-1)!;
-    expect(reply.text).toContain('https://share.example.com/s/share_1');
+    expect(reply.text).not.toContain('https://share.example.com/s/share_1');
     expect(reply.text).toContain('https://t.me/mybot/view?startapp=share_1');
-    expect(reply.opts?.webAppButton?.url).toBe('https://share.example.com/s/share_1');
+    expect(reply.opts?.miniAppButton?.url).toBe('https://t.me/mybot/view?startapp=share_1');
 
     // The collecting prompt (id 1) and the processing status (id 2) are
     // deleted once the share is ready

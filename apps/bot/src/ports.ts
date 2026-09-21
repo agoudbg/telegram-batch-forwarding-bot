@@ -24,8 +24,8 @@ export interface NormalizedMessage {
 export interface SendTextOptions {
   /** Attach the "Done — generate link" inline callback button */
   doneButton?: boolean;
-  /** Attach an inline WebApp button opening the share page */
-  webAppButton?: { text: string; url: string };
+  /** Attach an inline URL button opening the share Mini App */
+  miniAppButton?: { text: string; url: string };
 }
 
 /** Everything needed to re-send an unhosted file server-side

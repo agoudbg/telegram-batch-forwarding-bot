@@ -266,11 +266,11 @@ function buildButtons(opts: SendTextOptions): Api.ReplyInlineMarkup | undefined 
       }),
     );
   }
-  if (opts?.webAppButton !== undefined) {
+  if (opts?.miniAppButton !== undefined) {
     buttons.push(
-      new Api.KeyboardButtonWebView({
-        text: opts.webAppButton.text,
-        url: opts.webAppButton.url,
+      new Api.KeyboardButtonUrl({
+        text: opts.miniAppButton.text,
+        url: opts.miniAppButton.url,
       }),
     );
   }

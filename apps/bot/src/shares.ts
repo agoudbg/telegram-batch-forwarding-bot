@@ -43,10 +43,10 @@ export function buildShareReply(
 ): string {
   const lines = [
     `✅ Batch ready — ${messageCount} message${messageCount === 1 ? '' : 's'}.`,
-    ``,
-    `🔗 ${links.webUrl}`,
   ];
-  if (links.directLink !== null) lines.push(`📱 ${links.directLink}`);
+  if (links.directLink !== null) {
+    lines.push(``, `📱 ${links.directLink}`);
+  }
   if (media.failed > 0) {
     lines.push(`⚠️ ${media.failed} media registration${media.failed === 1 ? '' : 's'} failed.`);
   }

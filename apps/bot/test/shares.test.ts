@@ -42,13 +42,14 @@ describe('buildShareLinks / buildShareReply', () => {
     expect(links.directLink).toBeNull();
   });
 
-  it('does not describe on-demand media as unhosted', () => {
+  it('keeps the public page URL out of the completion reply', () => {
     const reply = buildShareReply(buildShareLinks(config, 'x'), 3, {
       hosted: 3,
       unhosted: 0,
       failed: 0,
     });
-    expect(reply).toContain('https://share.example.com/s/x');
+    expect(reply).not.toContain('https://share.example.com/s/x');
+    expect(reply).toContain('https://t.me/mybot/view?startapp=x');
     expect(reply).not.toContain('View in Telegram');
     expect(reply).toContain('3 messages');
   });

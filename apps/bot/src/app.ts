@@ -394,7 +394,10 @@ export class BotApp {
 
     const links = buildShareLinks(config, batch.id);
     await ports.sendText(batch.chatId, buildShareReply(links, batch.items.length, media), {
-      webAppButton: { text: 'Open share page', url: links.webUrl },
+      miniAppButton:
+        links.directLink === null
+          ? undefined
+          : { text: 'Open in Mini App', url: links.directLink },
     });
 
     // The share is ready: remove the transient prompt/status messages
