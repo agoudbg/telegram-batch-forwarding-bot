@@ -21,18 +21,25 @@ export interface ShareLinks {
   webUrl: string;
   /** t.me direct link opening the Mini App (when configured) */
   directLink: string | null;
+  /** t.me deep link opening Telegram's share chooser (when configured) */
+  shareLink: string | null;
 }
 
 export function buildShareLinks(
   config: { publicOrigin: string; botUsername: string; miniAppShortName?: string },
   shareId: string,
 ): ShareLinks {
+  const directLink =
+    config.miniAppShortName !== undefined
+      ? `https://t.me/${config.botUsername}/${config.miniAppShortName}?startapp=${shareId}`
+      : null;
   return {
     webUrl: `${config.publicOrigin}/s/${shareId}`,
-    directLink:
-      config.miniAppShortName !== undefined
-        ? `https://t.me/${config.botUsername}/${config.miniAppShortName}?startapp=${shareId}`
-        : null,
+    directLink,
+    shareLink:
+      directLink === null
+        ? null
+        : `https://t.me/share/url?url=${encodeURIComponent(directLink)}`,
   };
 }
 

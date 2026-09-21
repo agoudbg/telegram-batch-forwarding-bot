@@ -308,8 +308,9 @@ it later.
 
 - Finish → random share id → public → reply with the
   `t.me/<bot>/<app>?startapp=<id>` Mini App direct link and an inline
-  `KeyboardButtonUrl` button; the public HTTPS URL stays internal; /delete
-  revokes
+  `KeyboardButtonUrl` button; add a separate `Share` button using the
+  `t.me/share/url?url=<mini-app-link>` deep link; the public HTTPS URL stays
+  internal; /delete revokes
 - `/start get_<shareId>_<seq>` payload → verify public → re-send the file by
   reusing the InputDocument (FloodWait queue + rate limit)
 - Acceptance: manual end-to-end (API returning JSON suffices before web is

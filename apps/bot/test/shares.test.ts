@@ -35,11 +35,15 @@ describe('buildShareLinks / buildShareReply', () => {
     const links = buildShareLinks(config, 'abc123');
     expect(links.webUrl).toBe('https://share.example.com/s/abc123');
     expect(links.directLink).toBe('https://t.me/mybot/view?startapp=abc123');
+    expect(links.shareLink).toBe(
+      'https://t.me/share/url?url=https%3A%2F%2Ft.me%2Fmybot%2Fview%3Fstartapp%3Dabc123',
+    );
   });
 
   it('omits the direct link when no Mini App short name is configured', () => {
     const links = buildShareLinks({ ...config, miniAppShortName: undefined }, 'abc123');
     expect(links.directLink).toBeNull();
+    expect(links.shareLink).toBeNull();
   });
 
   it('keeps the public page URL out of the completion reply', () => {

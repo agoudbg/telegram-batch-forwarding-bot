@@ -257,26 +257,46 @@ function inputDocumentFromRef(ref: InputDocumentRef): Api.InputDocument {
 type SendTextOptions = Parameters<BotPorts['sendText']>[2];
 
 function buildButtons(opts: SendTextOptions): Api.ReplyInlineMarkup | undefined {
-  const buttons: Api.TypeKeyboardButton[] = [];
+  const rows: Api.KeyboardButtonRow[] = [];
   if (opts?.doneButton === true) {
-    buttons.push(
-      new Api.KeyboardButtonCallback({
-        text: '✅ Done — generate link',
-        data: Buffer.from('done'),
+    rows.push(
+      new Api.KeyboardButtonRow({
+        buttons: [
+          new Api.KeyboardButtonCallback({
+            text: '✅ Done — generate link',
+            data: Buffer.from('done'),
+          }),
+        ],
       }),
     );
   }
   if (opts?.miniAppButton !== undefined) {
-    buttons.push(
-      new Api.KeyboardButtonUrl({
-        text: opts.miniAppButton.text,
-        url: opts.miniAppButton.url,
+    rows.push(
+      new Api.KeyboardButtonRow({
+        buttons: [
+          new Api.KeyboardButtonUrl({
+            text: opts.miniAppButton.text,
+            url: opts.miniAppButton.url,
+          }),
+        ],
       }),
     );
   }
-  if (buttons.length === 0) return undefined;
+  if (opts?.shareButton !== undefined) {
+    rows.push(
+      new Api.KeyboardButtonRow({
+        buttons: [
+          new Api.KeyboardButtonUrl({
+            text: opts.shareButton.text,
+            url: opts.shareButton.url,
+          }),
+        ],
+      }),
+    );
+  }
+  if (rows.length === 0) return undefined;
   return new Api.ReplyInlineMarkup({
-    rows: [new Api.KeyboardButtonRow({ buttons })],
+    rows,
   });
 }
 

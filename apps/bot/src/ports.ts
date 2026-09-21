@@ -26,6 +26,8 @@ export interface SendTextOptions {
   doneButton?: boolean;
   /** Attach an inline URL button opening the share Mini App */
   miniAppButton?: { text: string; url: string };
+  /** Attach an inline URL button opening Telegram's share chooser */
+  shareButton?: { text: string; url: string };
 }
 
 /** Everything needed to re-send an unhosted file server-side
